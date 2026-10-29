@@ -21,7 +21,7 @@
       "value": ""
     },
     "containerImage": {
-      "value": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+      "value": "crghmaturitydemo977a.azurecr.io/github-maturity-assessment:1a8ec29f0ac36f9c8da5a420617765bc3ebf82d8"
     }
   }
 }

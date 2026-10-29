@@ -16,6 +16,8 @@ npm run test:demo
 
 `.env.demo` enables `VITE_DEMO_MODE=true` at build time. The ordinary local development/build mode below retains the original consultant-led browser-saving behavior.
 
+**Live Azure demo:** [Open the GitHub maturity assessment](https://ca-gh-maturity-demo-977a.graybay-0e1df60d.eastus2.azurecontainerapps.io/).
+
 ## Run locally
 
 Use Node.js 24 LTS or newer.
@@ -107,6 +109,32 @@ These are scenarios, **not quotes, guaranteed savings, or ROI**. They exclude im
 React + TypeScript + Vite. Vitest covers scoring, validation, and reports. Playwright covers the actual customer workflow, export/import, persistence, corrupt-storage handling, and responsive layouts on desktop and mobile.
 
 `infra/` packages the demo using Node 24 and non-root Nginx on port 8080. Bicep defines a Consumption Container App (0.25 vCPU, 0.5 GiB, zero to one replica), a Basic private registry, and a user-assigned managed identity with registry-scoped AcrPull. No database or application telemetry is provisioned. The image build sets `VITE_DEMO_MODE=true`; normal local builds do not.
+
+## Azure deployment
+
+The public demo runs in the **MCAPS-Hybrid-REQ-46931-2022-fabiopadua** subscription, resource group `rg-gh-maturity-demo-977a`, in **East US 2**. Images are built remotely in ACR; local Docker is not required. Registry admin credentials are disabled, and the app pulls images with managed identity.
+
+Estimated cost is **US$5-6/month at low demo traffic**, not a spending cap. The Basic registry remains billable while compute scales to zero. Build compute, excess storage, egress, taxes, and unexpected traffic are excluded. Initial requests after idling may have a cold start.
+
+After committing code changes, redeploy from the repository root in PowerShell:
+
+```powershell
+$sub = '05205f08-8cae-45d2-bf60-65805d367aa7'
+$registry = 'crghmaturitydemo977a'
+$tag = git rev-parse HEAD
+$deployedBy = az account show --subscription $sub --query user.name -o tsv
+az acr build --subscription $sub --registry $registry --image "github-maturity-assessment:$tag" --image github-maturity-assessment:demo --file infra\Dockerfile . --no-logs
+if ($LASTEXITCODE -ne 0) { throw 'Image build failed; deployment not started.' }
+az deployment sub create --subscription $sub --location eastus2 --template-file infra\main.bicep --parameters '@infra\main.parameters.json' "containerImage=${registry}.azurecr.io/github-maturity-assessment:$tag" "deployedBy=$deployedBy" 'createdAt=2026-10-29T16:18:33.2653722Z' --name gh-maturity-demo-code --query properties.provisioningState -o tsv
+```
+
+Keep the real image parameter on every deployment. `infra/main.parameters.json` is pinned to the initially deployed SHA image; the command above overrides it with the new commit. The generic Bicep default placeholder is only for first-time infrastructure bootstrapping.
+
+Delete the dedicated demo resource group when no longer needed; this permanently removes the app, environment, registry images, and managed identity:
+
+```powershell
+az group delete --subscription 05205f08-8cae-45d2-bf60-65805d367aa7 --name rg-gh-maturity-demo-977a --yes --no-wait
+```
 
 ## Reference material
 
