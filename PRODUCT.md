@@ -24,6 +24,8 @@ Assess governance, DevSecOps, delivery, developer experience, Copilot, and organ
 
 No hosted customer accounts, backend, or automatic GitHub data collection in the first version. Answers stay in the browser unless explicitly exported. Browser storage is not a secure enterprise customer-record system. Pricing and productivity figures must be customer-provided assumptions, never invented current prices or guaranteed savings.
 
+The user subsequently requested a public Azure demonstration in the MCAPS subscription, preferring Container Apps or App Service, with no assessment persistence. The hosted demo uses browser memory only and clears on refresh; the original local consultant mode remains available. East US 2 and public access with fictional/session-only data were confirmed.
+
 ## Brand Commitments
 
 The supplied modernization-assessment image guides information architecture: current state, readiness, deliverables, and a recommended journey. Preserve its navy, blue, purple, and teal visual vocabulary without suggesting official GitHub certification.

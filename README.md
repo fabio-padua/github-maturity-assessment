@@ -4,6 +4,18 @@ A local-first, consultant-led assessment for **GitHub Enterprise and GitHub Copi
 
 This is a custom advisory framework, **not an official GitHub assessment, certification, or compliance audit**.
 
+## Public demonstration mode
+
+The Azure deployment configuration builds **memory-only assessments**, with no database, automatic browser persistence, or answer telemetry. Refreshing or closing the page discards demo answers. Use fictional data. Explicit report/JSON downloads still work.
+
+```powershell
+npm run dev:demo
+npm run build:demo
+npm run test:demo
+```
+
+`.env.demo` enables `VITE_DEMO_MODE=true` at build time. The ordinary local development/build mode below retains the original consultant-led browser-saving behavior.
+
 ## Run locally
 
 Use Node.js 24 LTS or newer.
@@ -33,7 +45,7 @@ For a production-build preview, run `npm run preview -- --host 127.0.0.1`. Vite 
 4. Review the report: current and proposed architecture, decision matrix, findings, 30/60/90-day roadmap, pilot plan, business-case scenario, and complete response/evidence register.
 5. Export JSON backups and Markdown reports, or print the report / save it as PDF using the browser.
 
-Multiple assessments are isolated by identifier. JSON imports are validated and create **new copies**, never silently replacing existing customers. Deletion requires explicit confirmation. Corrupt storage is preserved for recovery rather than overwritten.
+Multiple assessments are isolated by identifier. JSON imports are validated and create **new copies**, never silently replacing existing customers. Deletion requires explicit confirmation. In local consultant mode, corrupt storage is preserved for recovery rather than overwritten.
 
 ## Scoring
 
@@ -78,12 +90,13 @@ These are scenarios, **not quotes, guaranteed savings, or ROI**. They exclude im
 ## Privacy and limitations
 
 - No backend, sign-in, API tokens, analytics, external fonts, or automatic GitHub data collection.
-- Answers live in **localStorage for this browser profile and origin**. They are not encrypted by the app or synchronized. Anyone with access to the profile can read them.
+- **Local consultant mode:** answers live in localStorage for this browser profile and origin. They are not encrypted by the app or synchronized. Anyone with access to the profile can read them.
+- **Public demo mode:** answers live in memory only, not localStorage or sessionStorage. Refreshing discards them. Existing local-mode saved data is neither read nor overwritten by the demo.
 - Do not enter credentials, secrets, or regulated personal data. Treat exports as customer-confidential files.
-- Export a JSON backup before clearing site data. A different browser, host, or port has different storage.
-- Storage errors are visible; export current work if the browser reaches its quota.
-- Editing pauses if another tab changes storage, preventing silent cross-tab overwrites.
-- Maximum 200 assessments and 5 MB per imported file. Actual browser storage limits may be lower.
+- In local mode, export a JSON backup before clearing site data. A different browser, host, or port has different storage.
+- In local mode, storage errors are visible; export current work if the browser reaches its quota.
+- In local mode, editing pauses if another tab changes storage, preventing silent cross-tab overwrites.
+- Maximum 200 assessments and 5 MB per imported file in both modes. Actual browser storage limits may be lower in local mode.
 - This first version is intended for facilitated sessions, not a hosted multi-tenant customer portal.
 - Interface and questionnaire are English. Portuguese localization and server-backed customer collaboration are future product decisions.
 
@@ -92,6 +105,8 @@ These are scenarios, **not quotes, guaranteed savings, or ROI**. They exclude im
 `src/model.ts` contains the typed question bank and synthetic example. `src/scoring.ts` owns scoring, route selection, and roadmap generation. `src/storage.ts` validates persisted/imported data. `src/report.ts` generates portable reports. `src/App.tsx` provides the assessment workspace.
 
 React + TypeScript + Vite. Vitest covers scoring, validation, and reports. Playwright covers the actual customer workflow, export/import, persistence, corrupt-storage handling, and responsive layouts on desktop and mobile.
+
+`infra/` packages the demo using Node 24 and non-root Nginx on port 8080. Bicep defines a Consumption Container App (0.25 vCPU, 0.5 GiB, zero to one replica), a Basic private registry, and a user-assigned managed identity with registry-scoped AcrPull. No database or application telemetry is provisioned. The image build sets `VITE_DEMO_MODE=true`; normal local builds do not.
 
 ## Reference material
 

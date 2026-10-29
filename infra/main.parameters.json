@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": {
+      "value": "gh-maturity-demo-977a"
+    },
+    "location": {
+      "value": "eastus2"
+    },
+    "sessionId": {
+      "value": "977a1eea-19ff-4086-abab-6adacef57e1f"
+    },
+    "deployedBy": {
+      "value": ""
+    },
+    "createdAt": {
+      "value": ""
+    },
+    "deployerObjectId": {
+      "value": ""
+    },
+    "containerImage": {
+      "value": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+    }
+  }
+}

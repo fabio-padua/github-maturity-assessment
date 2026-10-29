@@ -2,6 +2,7 @@ import { allQuestions } from './model'
 import type { Assessment } from './model'
 
 export const storageKey = 'github-maturity-assessment:v1'
+export const demoMode = import.meta.env?.VITE_DEMO_MODE === 'true'
 export type Snapshot = { schemaVersion: 1; assessments: Assessment[]; activeId: string | null }
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 const isText = (value: unknown, max = 20000): value is string => typeof value === 'string' && value.length <= max
@@ -54,6 +55,7 @@ export function parseSnapshot(text: string): Snapshot {
 }
 
 export function loadSnapshot(): { snapshot: Snapshot; error: string | null } {
+  if (demoMode) return { snapshot: { schemaVersion: 1, assessments: [], activeId: null }, error: null }
   try {
     const text = localStorage.getItem(storageKey)
     return { snapshot: text ? parseSnapshot(text) : { schemaVersion: 1, assessments: [], activeId: null }, error: null }
