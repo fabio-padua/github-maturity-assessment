@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-29T15:14:47.983Z",
+  "title": "Design System: GitHub Maturity Assessment",
+  "extensions": {
+    "motion": [
+      { "name": "button-state", "value": "background .15s, border-color .15s", "purpose": "Button hover changes." },
+      { "name": "radar-reveal", "value": ".65s cubic-bezier(.16, 1, .3, 1)", "purpose": "Radar clip-path reveal; reduced motion disables animation and transitions." }
+    ],
+    "breakpoints": [
+      { "name": "wide-min", "value": "1600px" },
+      { "name": "compact-max", "value": "1220px" },
+      { "name": "rail-max", "value": "950px" },
+      { "name": "mobile-max", "value": "760px" },
+      { "name": "narrow-max", "value": "400px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary assessment action; disabled opacity is .48.",
+      "html": "<button class=\"ds-primary\">Review responses</button>",
+      "css": ".ds-primary{font:700 13px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:12px 17px;min-height:41px;border:1px solid #71b3ff;border-radius:6px;color:#08182b;background:#65afff;cursor:pointer;transition:background .15s,border-color .15s}.ds-primary:hover:not(:disabled){background:#8bc3ff}.ds-primary:focus-visible{outline:2px solid #8cc4ff;outline-offset:4px}.ds-primary:disabled{opacity:.48;cursor:not-allowed}@media(prefers-reduced-motion:reduce){.ds-primary{transition:none}}"
+    },
+    {
+      "name": "Secondary button",
+      "kind": "button",
+      "description": "Outlined dark secondary action.",
+      "html": "<button class=\"ds-secondary\">Export JSON</button>",
+      "css": ".ds-secondary{font:700 13px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:12px 17px;min-height:41px;border:1px solid #354964;border-radius:6px;color:#dce8f8;background:#142139;cursor:pointer;transition:background .15s,border-color .15s}.ds-secondary:hover:not(:disabled){background:#1c304e;border-color:#5b7da5}.ds-secondary:focus-visible{outline:2px solid #8cc4ff;outline-offset:4px}.ds-secondary:disabled{opacity:.48;cursor:not-allowed}@media(prefers-reduced-motion:reduce){.ds-secondary{transition:none}}"
+    },
+    {
+      "name": "Text field",
+      "kind": "input",
+      "description": "Inset field and visible label.",
+      "html": "<label class=\"ds-field\">Customer name<input class=\"ds-input\" placeholder=\"Customer name\"></label>",
+      "css": ".ds-field{display:flex;flex-direction:column;gap:9px;font:13px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#cad7e9;min-width:0}.ds-input{font:13px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:12px;min-height:41px;color:#e0eafb;background:#0c182b;border:1px solid #354963;border-radius:5px;color-scheme:dark}.ds-input::placeholder{color:#8c9fb8;font-size:12px}.ds-input:focus-visible{outline:2px solid #8cc4ff;outline-offset:4px}"
+    },
+    {
+      "name": "Selected navigation",
+      "kind": "nav",
+      "description": "Selected workspace destination.",
+      "html": "<nav aria-label=\"Assessment workspace\"><button class=\"ds-nav\" aria-current=\"page\">Overview</button></nav>",
+      "css": ".ds-nav{font:13px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:13px 12px;border:1px solid #244971;border-radius:7px;background:#182d4b;color:#78b9ff;text-align:left;cursor:pointer}.ds-nav:hover{color:#78b9ff;background:#182d4b}.ds-nav:focus-visible{outline:2px solid #8cc4ff;outline-offset:4px}"
+    },
+    {
+      "name": "Completion tag",
+      "kind": "chip",
+      "description": "Non-interactive self-reported completion status.",
+      "html": "<span class=\"ds-tag\">Complete · self-reported</span>",
+      "css": ".ds-tag{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border:1px solid #226158;border-radius:4px;color:#7ce6ce;background:#123b3b;font:550 11px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;white-space:nowrap}"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Flat bordered container; no shadow or interactive hover state.",
+      "html": "<section class=\"ds-panel\"><h2>Maturity by dimension</h2></section>",
+      "css": ".ds-panel{background:var(--panel,#111e33);border:1px solid var(--border,#293951);border-radius:9px;padding:24px;min-width:0;color:#e6edf7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.ds-panel h2{margin:0;font-size:17px;font-weight:650;line-height:1.4;letter-spacing:-.025em}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Evidence-led assessment workspace",
+    "keyCharacteristics": [
+      "Dense but readable decision support, with traceable scores and evidence.",
+      "Flat, outlined surfaces; color differentiates dimensions, state, and recommended journeys.",
+      "Local-first continuity, conspicuous sample labeling, and actionable next steps."
+    ]
+  }
+}
