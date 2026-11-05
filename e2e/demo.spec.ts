@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { translator } from '../src/i18n/core'
 
 test('public demo never accesses browser storage and discards answers on refresh', async ({ page }) => {
   const errors: string[] = []
@@ -18,6 +19,11 @@ test('public demo never accesses browser storage and discards answers on refresh
   await page.getByRole('button', { name: 'Continue to questions' }).click()
   await page.getByRole('radio').nth(3).check()
   await page.getByLabel('Evidence & session notes').fill('This note must not survive reload.')
+  await page.getByRole('button', { name: 'User preferences', exact: true }).click()
+  await page.getByRole('menuitemradio', { name: 'Português (Brasil)', exact: true }).click()
+  await expect(page.getByLabel(translator('pt-BR')('ui.evidence_session_notes'))).toHaveValue('This note must not survive reload.')
+  await page.getByRole('button', { name: translator('pt-BR')('language.menu'), exact: true }).click()
+  await page.getByRole('menuitemradio', { name: 'English', exact: true }).click()
   await page.getByRole('button', { name: 'Overview', exact: true }).click()
   await expect(page.getByText('Provisional', { exact: true })).toBeVisible()
   await expect(page.getByText('Ephemeral Demo Customer', { exact: true })).toBeAttached()

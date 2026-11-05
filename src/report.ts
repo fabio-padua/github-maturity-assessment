@@ -1,60 +1,73 @@
 import { pillars, ratingNames } from './model'
 import type { Assessment } from './model'
 import { assess, businessCase, level, methodologyVersion, roadmap } from './scoring'
+import { contentTranslator, formatDate, formatNumber, hostingName, planName, platformName, sampleText, translator } from './i18n/core'
+import type { Locale } from './i18n/core'
 
-export function reportMarkdown(a: Assessment) {
+export function reportMarkdown(a: Assessment, locale: Locale = 'en') {
   const r = assess(a)
   const b = businessCase(a)
+  const t = translator(locale)
+  const c = contentTranslator(locale)
   const safe = (text: string) => text.replace(/[\r\n|]/g, ' ').replace(/[<>]/g, '')
+  const userText = (value: string) => safe(sampleText(a.sample, value, locale))
+  const score = (value: number | null) => value === null ? t('ui.not_assessed') : `${formatNumber(Math.round(value), locale)}/100`
+  const context = {
+    platform: platformName(a.platform, locale), hosting: hostingName(a.hosting, locale), plan: planName(a.copilotPlan, locale),
+  }
+  const heading = (text: string) => `## ${text}`
   return [
-    `# GitHub maturity assessment: ${safe(a.customer || 'Unnamed customer')}`,
-    a.sample ? '**SYNTHETIC SAMPLE - not customer evidence.**' : '',
-    `Date: ${a.date} | Facilitator: ${safe(a.facilitator || 'Not specified')}`,
-    `Status: ${r.complete ? 'Complete, self-reported' : 'PROVISIONAL - incomplete assessment'}`,
-    `Methodology: ${methodologyVersion} | Responses: ${r.answered}/${r.total} | Evidence notes: ${r.evidence}/${r.rated}`,
-    '', '## Executive summary', '',
-    `Maturity: ${r.score === null ? 'Not assessed' : `${Math.round(r.score)}/100 - ${level(r.score)}`}.`,
-    `Readiness: ${r.readinessScore === null ? 'Not assessed' : `${Math.round(r.readinessScore)}/100`}.`,
-    `Recommended path: **${r.path}**. ${r.rationale}`,
-    '', '## Current state', '',
-    `Primary platform: ${a.platform}. Hosting target: ${a.hosting}. Developers: ${a.developers || 'Not specified'}. Copilot plan: ${a.copilotPlan}.`,
-    `Dependencies: ${safe(a.dependencies || 'Not documented')}`,
-    `Constraints: ${safe(a.constraints || 'Not documented')}`,
-    '', '## Maturity by dimension', '',
-    '| Dimension | Weight | Score | Level | Rated / applicable |',
+    `# ${t('report.title', { customer: safe(a.customer || t('ui.customer')) })}`,
+    a.sample ? t('report.synthetic_sample_not_customer_evidence') : '',
+    t('report.date', { date: formatDate(a.date, locale), facilitator: userText(a.facilitator || t('ui.not_specified')) }),
+    t('report.status', { status: t(r.complete ? 'report.complete_self_reported' : 'report.provisional_incomplete_assessment') }),
+    t('report.coverage', { version: methodologyVersion, answered: r.answered, total: r.total, evidence: r.evidence, rated: r.rated }),
+    '', heading(t('ui.executive_summary')), '',
+    t('report.maturity', { score: r.score === null ? score(null) : `${score(r.score)} - ${c(level(r.score))}` }),
+    t('report.readiness', { score: score(r.readinessScore) }),
+    t('report.path', { path: c(r.path), rationale: c(r.rationale) }),
+    '', heading(t('ui.current_state_maturity')), '',
+    t('report.context', { ...context, developers: a.developers ? formatNumber(a.developers, locale) : t('ui.not_specified') }),
+    t('report.dependencies', { text: userText(a.dependencies || t('ui.not_yet_documented')) }),
+    t('report.constraints', { text: userText(a.constraints || t('ui.not_yet_documented')) }),
+    '', heading(t('ui.maturity_by_dimension')), '',
+    t('report.dimension_weight_score_level_rated_applicable'),
     '| --- | --- | --- | --- | --- |',
-    ...r.results.map(p => `| ${p.pillar.name} | ${p.pillar.weight}% | ${p.score === null ? 'Not assessed' : Math.round(p.score)} | ${level(p.score)} | ${p.answered}/${p.total} |`),
-    '', '## Findings & recommendations', '',
-    ...r.findings.map(f => `- **${f.priority} - ${f.question.title}** (${f.rating}/4). ${f.question.action}`),
-    ...(r.findings.length ? [] : ['No scored gaps below Managed. Validate reported controls with evidence; missing answers are not evidence of maturity.']),
-    ...(r.criticalUnknown.length ? [`- Unanswered critical controls: ${r.criticalUnknown.map(q => q.title).join('; ')}`] : []),
-    '', '## Architecture: as-is to to-be', '',
-    `As-is: ${a.platform} development platform; ${a.hosting} hosting target; ${a.copilotPlan} Copilot plan.`,
-    'Proposed target (requires validation): centrally governed identity and organizations -> reviewed repositories -> reusable CI/CD -> protected environments; governed Copilot supports developers across the workflow.',
-    r.path === 'Hybrid' ? 'Retain necessary boards, server workloads, and integrations behind documented ownership and integration boundaries.' : 'Validate integrations, hosting eligibility, and migration boundaries before changing production workloads.',
-    '', '## 30/60/90-day roadmap', '',
-    ...roadmap(a).flatMap(w => [`### First ${w.days} days: ${w.title}`, `Suggested owner: ${w.owner}`, ...w.actions.map(action => `- ${action}`), `Exit criteria: ${w.exit}`, '']),
-    '## Pilot / POV deployment plan', '',
-    'Select one representative team and non-critical workload. Baseline developer friction, delivery quality, and adoption. Agree on identity, data handling, rollback, support, and go/no-go criteria before enabling tools. Review evidence at day 60 before expanding.',
-    '', '## Business case & licensing scenario', '',
-    `Proposed Copilot seats: ${a.seats}. Plan: ${a.copilotPlan}.`,
-    b.annual === null ? 'License cost not estimated: enter a customer-provided monthly seat price.'
-      : `Customer-provided seat price: ${a.seatCost} USD/month. Annual license-only scenario: ${b.annual.toFixed(2)} USD.`,
-    b.gross === null ? 'Productivity scenario not estimated: hours and loaded hourly rate have not both been supplied.'
-      : `Illustrative gross capacity value: ${b.gross.toFixed(2)} USD/year, assuming ${a.hoursSaved} hours/seat/week, ${a.hourlyRate} USD/hour, ${a.seats} seats, and 46 working weeks.`,
-    'These are user-supplied scenarios, not a quote, guaranteed savings, or ROI. They exclude implementation, support, taxes, and existing licensing overlap. Confirm plan capabilities and commercial terms with procurement.',
-    '', '## Response and evidence register', '',
-    ...pillars.flatMap(p => [`### ${p.name}`, ...p.questions.flatMap(q => {
+    ...r.results.map(p => `| ${c(p.pillar.name)} | ${p.pillar.weight}% | ${p.score === null ? score(null) : formatNumber(Math.round(p.score), locale)} | ${c(level(p.score))} | ${p.answered}/${p.total} |`),
+    '', heading(t('ui.findings_recommendations')), '',
+    ...r.findings.map(f => `- **${c(f.priority)} - ${c(f.question.title)}** (${f.rating}/4). ${c(f.question.action)}`),
+    ...(r.findings.length ? [] : [t('report.no_scored_gaps_below_managed_validate_reported_controls_with')]),
+    ...(r.criticalUnknown.length ? [`- ${t('report.critical_unknown', { text: r.criticalUnknown.map(q => c(q.title)).join('; ') })}`] : []),
+    '', heading(t('report.architecture')), '',
+    t('report.as_is', context),
+    t('report.proposed_target_requires_validation_centrally_governed_identity_and_organizations'),
+    t(r.path === 'Hybrid' ? 'report.retain_necessary_boards_server_workloads_and_integrations_behind_documented' : 'report.validate_integrations_hosting_eligibility_and_migration_boundaries_before_changing'),
+    '', heading(t('report.roadmap')), '',
+    ...roadmap(a).flatMap(w => [
+      `### ${t('report.days', { days: w.days, title: c(w.title) })}`, t('report.owner', { owner: c(w.owner) }),
+      ...w.actions.map(action => `- ${c(action)}`), t('report.exit', { text: c(w.exit) }), '',
+    ]),
+    heading(t('ui.pilot_pov_deployment_plan')), '',
+    t('report.select_one_representative_team_and_non_critical_workload_baseline'),
+    '', heading(t('ui.business_case_licensing_scenario')), '',
+    t('report.seats', { seats: a.seats, plan: context.plan }),
+    b.annual === null ? t('report.license_cost_not_estimated_enter_a_customer_provided_monthly')
+      : t('report.annual', { price: formatNumber(Number(a.seatCost), locale, 2), annual: formatNumber(b.annual, locale, 2) }),
+    b.gross === null ? t('report.productivity_scenario_not_estimated_hours_and_loaded_hourly_rate')
+      : t('report.capacity', { gross: formatNumber(b.gross, locale, 2), hours: formatNumber(Number(a.hoursSaved), locale, 2), rate: formatNumber(Number(a.hourlyRate), locale, 2), seats: a.seats }),
+    t('report.these_are_user_supplied_scenarios_not_a_quote_guaranteed'),
+    '', heading(t('report.register')), '',
+    ...pillars.flatMap(p => [`### ${c(p.name)}`, ...p.questions.flatMap(q => {
       const answer = a.answers[q.id]
-      return [`- **${q.title}**`, `  Response: ${!answer || answer.value === null ? 'Unanswered' : answer.value === 'na' ? 'Not applicable' : `${answer.value}/4 - ${ratingNames[answer.value]}: ${q.options[answer.value]}`}`,
-        `  Evidence / rationale: ${safe(answer?.evidence || 'Not supplied')}`]
+      return [`- **${c(q.title)}**`, t('report.response', { text: !answer || answer.value === null ? t('ui.unanswered') : answer.value === 'na' ? t('ui.not_applicable') : `${answer.value}/4 - ${c(ratingNames[answer.value])}: ${c(q.options[answer.value])}` }),
+        t('report.evidence', { text: userText(answer?.evidence || t('ui.not_supplied')) })]
     }), '']),
-    '## Methodology & limitations', '',
-    'Each rating is 0-4. Dimension score = sum of rated answers / (4 x rated-answer count) x 100. Overall score = weighted mean of dimensions with rated answers; excluded dimension weights are renormalized. Missing answers are not zero and make the result provisional. Not-applicable answers are excluded, require a rationale, and are forbidden for critical controls.',
-    'Levels: Initial [0,20), Developing [20,40), Defined [40,60), Managed [60,80), Optimizing [80,100]. Level thresholds use unrounded scores.',
-    'Readiness is the equally weighted mean of assessed Governance, DevSecOps, and Change readiness dimensions. Evidence notes are self-reported, not independently verified. This is a custom advisory framework, not an official GitHub certification or benchmark.',
-    'Route precedence: unanswered critical controls or critical ratings below 2 -> Secure DevOps; mixed platform or server target -> Hybrid; non-GitHub primary platform -> Migrate; otherwise -> Optimize + Copilot. Scores do not override critical risks.',
-    '', 'References: https://docs.github.com/en/enterprise-cloud@latest/admin | https://docs.github.com/en/copilot | https://github.com/features/copilot/plans',
+    heading(t('report.limitations')), '',
+    t('report.each_rating_is_0_4_dimension_score_sum_of'),
+    t('report.levels_initial_0_20_developing_20_40_defined_40'),
+    t('report.readiness_is_the_equally_weighted_mean_of_assessed_governance'),
+    t('report.route_precedence_unanswered_critical_controls_or_critical_ratings_below'),
+    '', t('report.references_https_docs_github_com_en_enterprise_cloud_latest'),
   ].join('\n')
 }
 
@@ -68,5 +81,5 @@ export function download(name: string, content: string, type: string) {
 }
 
 export function fileStem(customer: string) {
-  return customer.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) || 'assessment'
+  return customer.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) || 'assessment'
 }
