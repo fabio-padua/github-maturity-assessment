@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo } from 'react'
 import { pillars, ratingNames } from '../model'
 import { assess, level, pathDescriptions, roadmap } from '../scoring'
-import { contentTranslator, formatMoney, formatDate, formatNumber, translator, sampleText, planName, hostingName } from './core'
+import { contentTranslator, formatMoney, formatDate, formatNumber, formatAssumption, translator, sampleText, planName, hostingName } from './core'
 import type { Locale } from './core'
 
 export const LocaleContext = createContext<{ locale: Locale; setLocale: (locale: Locale) => void } | null>(null)
@@ -48,6 +48,7 @@ export function useI18n() {
     date: (value: string) => formatDate(value, locale),
     formatMoney: (value: number) => formatMoney(value, locale),
     number: (value: string | number, digits = 0) => formatNumber(Number(value), locale, digits),
+    assumption: (value: string) => formatAssumption(value, locale),
     platformLabels: { github: 'GitHub', 'azure-devops': 'Azure DevOps', mixed: 'GitHub + Azure DevOps', other: translator(locale)('ui.other_platform') },
     planLabel: (value: string) => planName(value, locale),
     hostingLabel: (value: string) => hostingName(value, locale),

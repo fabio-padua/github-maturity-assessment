@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
-import { languageNames, translator } from '../src/i18n/core'
+import { languageNames, locales, translator, formatMoney } from '../src/i18n/core'
 import type { Locale } from '../src/i18n/core'
 
 async function switchLanguage(page: import('@playwright/test').Page, current: Locale, next: Locale) {
@@ -9,6 +9,42 @@ async function switchLanguage(page: import('@playwright/test').Page, current: Lo
   await expect(page.locator('html')).toHaveAttribute('lang', next)
   await expect(page.getByRole('menu')).toHaveCount(0)
 }
+
+test('preserves supplied assumption precision in Markdown and printable reports in every language', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Start an assessment', exact: true }).click()
+  await page.getByLabel('Customer / organization *').fill('Precision regression')
+  await page.getByLabel('Proposed Copilot seats').fill('1000')
+  await page.getByLabel('Monthly price per Copilot seat (USD)').fill('0.00400')
+  await page.getByLabel('Assumed hours saved / seat / week').fill('0.004')
+  await page.getByLabel('Loaded hourly rate (USD)').fill('50.0000')
+  await page.getByRole('button', { name: 'Report & roadmap', exact: true }).click()
+  let current: Locale = 'en'
+  for (const locale of locales) {
+    if (current !== locale) await switchLanguage(page, current, locale)
+    current = locale
+    const t = translator(locale)
+    const separator = locale === 'en' ? '.' : ','
+    const seats = locale === 'en' ? '1,000' : locale === 'pt-BR' ? '1.000' : '1000'
+    const assumptions = page.locator('.report-view .muted.small')
+    await page.emulateMedia({ media: 'print' })
+    await expect(assumptions).toContainText(t('ui.seats_usd_month_12', { p1: seats, p2: `0${separator}00400` }))
+    await expect(assumptions).toContainText(t('ui.seats_hours_week_usd_hour_46_weeks', { p1: seats, p2: `0${separator}004`, p3: `50${separator}0000` }))
+    await expect(page.locator('.business-results')).toContainText(formatMoney(9200, locale))
+    await page.emulateMedia({ media: null })
+    const downloaded = page.waitForEvent('download')
+    await page.getByRole('button', { name: t('ui.export_markdown'), exact: true }).click()
+    const report = await readFile((await (await downloaded).path())!, 'utf8')
+    expect(report).toContain(`0${separator}00400`)
+    expect(report).toContain(`0${separator}004`)
+    expect(report).toContain(`50${separator}0000`)
+    expect(report).toContain(t('report.annual', { price: `0${separator}00400`, annual: `48${separator}00` }))
+    expect(report).toContain(t('report.capacity', {
+      gross: locale === 'en' ? '9,200.00' : locale === 'pt-BR' ? '9.200,00' : '9200,00',
+      hours: `0${separator}004`, rate: `50${separator}0000`, seats: 1000,
+    }))
+  }
+})
 
 for (const locale of ['pt-BR', 'es'] as const) {
   test(`${locale}: localizes all surfaces and exports without altering answers`, async ({ page }, testInfo) => {

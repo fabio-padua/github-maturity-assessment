@@ -72,6 +72,16 @@ export function formatDate(value: string, locale: Locale) {
 export function formatNumber(value: number, locale: Locale, digits = 0) {
   return new Intl.NumberFormat(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value)
 }
+export function formatAssumption(value: string, locale: Locale) {
+  const parts = /^(\d+)(?:\.(\d+))?$/.exec(value)
+  if (!parts) throw new RangeError('Expected a non-negative decimal assumption.')
+  const integer = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(BigInt(parts[1]))
+  if (parts[2] === undefined) return integer
+  const decimal = new Intl.NumberFormat(locale).formatToParts(1.1).find(part => part.type === 'decimal')
+  if (!decimal) throw new RangeError(`No decimal separator for locale ${locale}`)
+  // Keep fractional digits as text; Number conversion or a fixed digit cap can lose supplied precision.
+  return `${integer}${decimal.value}${parts[2]}`
+}
 export function formatMoney(value: number, locale: Locale) {
   return new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value)
 }

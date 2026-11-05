@@ -260,7 +260,7 @@ function Report({ a, exportReport, go }: {
   exportReport: () => void
   go: (view: View) => void
 }) {
-  const { t, assess, level, formatMoney, platformLabels, pathDescriptions, content, pillars, sampleText, date, planLabel, hostingLabel, number } = useI18n()
+  const { t, assess, level, formatMoney, platformLabels, pathDescriptions, content, pillars, sampleText, date, planLabel, hostingLabel, number, assumption } = useI18n()
   const r = assess(a)
   const b = businessCase(a)
   useEffect(() => {
@@ -295,7 +295,7 @@ function Report({ a, exportReport, go }: {
   <section className="panel"><h2>{t("ui.pilot_pov_deployment_plan")}</h2><div className="pilot-plan"><div><h3>{t("ui.scope")}</h3><p>{t("ui.one_representative_team_and_a_non_critical_workload_with")}</p></div><div><h3>{t("ui.guardrails")}</h3><p>{t("ui.confirm_identity_data_handling_approved_ai_policy_support_and")}</p></div><div><h3>{t("ui.success_criteria")}</h3><p>{t("ui.baseline_developer_friction_adoption_delivery_and_quality_agree_on")}</p></div></div><p className="muted">{t("ui.review_at_day_60_expand_only_when_customer_approved")}</p></section>
   <section className="panel"><div className="section-heading"><div><h2>{t("ui.business_case_licensing_scenario")}</h2><p>{t("ui.customer_provided_assumptions_only_edit_these_in_the_questionnaire")}</p></div><button className="text-button no-print" onClick={() => go('assessment')}>{t("ui.edit_assumptions")}<Icon name="arrow" size={15}/></button></div>
     <div className="business-results"><div><span>{t("ui.proposed_seats")}</span><strong>{a.seats}</strong></div><div><span>{t("ui.annual_license_only_scenario")}</span><strong>{b.annual === null ? t("ui.not_estimated") : formatMoney(b.annual)}</strong></div><div><span>{t("ui.illustrative_gross_capacity_value_year")}</span><strong>{b.gross === null ? t("ui.not_estimated") : formatMoney(b.gross)}</strong></div></div>
-    <p className="muted small">{b.annual !== null && t("ui.seats_usd_month_12", { p1: number(a.seats), p2: number(a.seatCost, 2) })}{b.gross !== null && t("ui.seats_hours_week_usd_hour_46_weeks", { p1: number(a.seats), p2: number(a.hoursSaved, 2), p3: number(a.hourlyRate, 2) })}{t("ui.not_a_quote_guaranteed_savings_or_roi_excludes_implementation")}</p>
+    <p className="muted small">{b.annual !== null && t("ui.seats_usd_month_12", { p1: number(a.seats), p2: assumption(a.seatCost) })}{b.gross !== null && t("ui.seats_hours_week_usd_hour_46_weeks", { p1: number(a.seats), p2: assumption(a.hoursSaved), p3: assumption(a.hourlyRate) })}{t("ui.not_a_quote_guaranteed_savings_or_roi_excludes_implementation")}</p>
   </section>
   <section className="panel evidence-register"><h2>{t("ui.response_evidence_register")}</h2>{pillars.map(p => <details key={p.id}><summary>{p.name}<span>{t("counts.answers", { count: p.questions.filter(q => isAnswered(a, q.id)).length, total: 5 })}</span></summary>{p.questions.map(q => {
         const answer = a.answers[q.id]

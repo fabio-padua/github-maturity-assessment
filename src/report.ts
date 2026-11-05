@@ -1,7 +1,7 @@
 import { pillars, ratingNames } from './model'
 import type { Assessment } from './model'
 import { assess, businessCase, level, methodologyVersion, roadmap } from './scoring'
-import { contentTranslator, formatDate, formatNumber, hostingName, planName, platformName, sampleText, translator } from './i18n/core'
+import { contentTranslator, formatDate, formatNumber, formatAssumption, hostingName, planName, platformName, sampleText, translator } from './i18n/core'
 import type { Locale } from './i18n/core'
 
 export function reportMarkdown(a: Assessment, locale: Locale = 'en') {
@@ -52,9 +52,9 @@ export function reportMarkdown(a: Assessment, locale: Locale = 'en') {
     '', heading(t('ui.business_case_licensing_scenario')), '',
     t('report.seats', { seats: a.seats, plan: context.plan }),
     b.annual === null ? t('report.license_cost_not_estimated_enter_a_customer_provided_monthly')
-      : t('report.annual', { price: formatNumber(Number(a.seatCost), locale, 2), annual: formatNumber(b.annual, locale, 2) }),
+      : t('report.annual', { price: formatAssumption(a.seatCost, locale), annual: formatNumber(b.annual, locale, 2) }),
     b.gross === null ? t('report.productivity_scenario_not_estimated_hours_and_loaded_hourly_rate')
-      : t('report.capacity', { gross: formatNumber(b.gross, locale, 2), hours: formatNumber(Number(a.hoursSaved), locale, 2), rate: formatNumber(Number(a.hourlyRate), locale, 2), seats: a.seats }),
+      : t('report.capacity', { gross: formatNumber(b.gross, locale, 2), hours: formatAssumption(a.hoursSaved, locale), rate: formatAssumption(a.hourlyRate, locale), seats: a.seats }),
     t('report.these_are_user_supplied_scenarios_not_a_quote_guaranteed'),
     '', heading(t('report.register')), '',
     ...pillars.flatMap(p => [`### ${c(p.name)}`, ...p.questions.flatMap(q => {

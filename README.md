@@ -111,6 +111,7 @@ The locale is kept in the URL (`?lang=en`, `?lang=pt-BR`, `?lang=es`), not brows
 - `src/i18n/en.ts` is the canonical copy catalog and defines the stable `MessageKey` union. Change wording there without renaming its key.
 - `src/i18n/pt-BR.ts` and `src/i18n/es.ts` must implement every key with `satisfies Record<MessageKey, string>`; missing or misspelled keys fail the build.
 - Use `useI18n().t(key, values)` for React copy and `translator(locale)` outside React. Keep whole messages with `{namedPlaceholders}` where ordering or counts matter; never concatenate translated fragments for new copy. Supply separate singular/plural messages.
+- Format entered prices, hours, and hourly rates with `formatAssumption` (or `useI18n().assumption`) to preserve every supplied fractional digit, including trailing zeros. Use `formatNumber`/`formatMoney` with explicit rounding only for calculated totals; do not convert decimal assumption strings to `Number` for display.
 - Question IDs, option indices, platform values, scoring rules, and JSON field names must never be translated. The model references canonical catalog copy; the display adapter localizes that copy without mutating customer records.
 - Never send customer names, notes, or free text to a translation service. Only built-in synthetic sample text is localized; customer-authored content stays untouched.
 - When adding a language, extend `locales`, `languageNames`, `catalogs`, and `resolveLocale` in `src/i18n/core.ts`, add its complete catalog, and extend the browser scenarios.
