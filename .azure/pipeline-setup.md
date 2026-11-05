@@ -1,6 +1,6 @@
 # Azure demo continuous deployment
 
-This setup is **not executed merely by opening this PR**. It is the one-time administrator step needed before `.github/workflows/deploy.yml` can authenticate. Until it is completed, CD fails clearly on missing repository variables; it does not silently skip deployment or fall back to passwords.
+The deployment identity was created and verified on 2026-11-05 at the user's request. GitHub secrets are still configured by the repository administrator; opening or merging this PR does not populate them. Until configured, CD fails clearly on missing repository secrets; it does not silently skip deployment or fall back to passwords.
 
 ## Target and permissions
 
@@ -11,12 +11,12 @@ This setup is **not executed merely by opening this PR**. It is the one-time adm
 | Application resource group | `rg-gh-maturity-demo-977a` |
 | Container App | `ca-gh-maturity-demo-977a` |
 | Registry | `crghmaturitydemo977a` (Basic, classic permissions, admin disabled) |
-| Identity resource group to create | `rg-gh-maturity-demo-ci` |
-| Pipeline identity to create | `id-gh-maturity-demo-ci` |
+| Identity resource group | `rg-gh-maturity-demo-ci` |
+| Pipeline identity | `id-gh-maturity-demo-ci` |
 | Region | East US 2 |
 | GitHub repository | `fabio-padua/github-maturity-assessment` |
 
-The deployment identity is separate from the application's AcrPull identity. Its federated credential accepts only:
+The deployment identity is separate from the application's AcrPull identity. A user-assigned managed identity has a backing Microsoft Entra **Service Principal** (`servicePrincipalType: ManagedIdentity`). `AZURE_CLIENT_ID` is its client/application ID, not its principal/object ID and not a password. Its federated credential accepts only:
 
 ```text
 Issuer:   https://token.actions.githubusercontent.com
@@ -26,11 +26,32 @@ Audience: api://AzureADTokenExchange
 
 Contributor is granted **only on the existing application resource group**, enabling ACR remote builds and resource-group Bicep deployment. It is not Owner, cannot grant Azure RBAC, and has no role on its own separate identity resource group, so it cannot rewrite its federation. This remains a powerful deployment role: protect repository administration and changes to `main`.
 
-GitHub reports this private personal repository is on **Free**, which lacks private-repository branch protection and deployment environments. Accordingly, this workflow uses a strict **main-ref OIDC subject and repository variables**, rather than assuming paid environment/approval features or making the repository public. It gates deployment on successful CI but **does not enforce PRs or independent review**. After upgrading or moving to a licensed organization, enable required PR checks/reviews; environment approvals can then replace the main-ref federation and add a deployment gate.
+GitHub reports this private personal repository is on **Free**, which lacks private-repository branch protection and deployment environments. Accordingly, this workflow uses a strict **main-ref OIDC subject and repository secrets**, rather than assuming paid environment/approval features or making the repository public. It gates deployment on successful CI but **does not enforce PRs or independent review**. After upgrading or moving to a licensed organization, enable required PR checks/reviews; environment approvals can then replace the main-ref federation and add a deployment gate.
 
 Only the existing demo is configured. No staging/production Azure resources are invented. The identity and resource group have no base compute cost; normal image build, registry, traffic, and Container Apps charges still apply. Old SHA/run-tagged images accumulate until cleaned up.
 
-## One-time setup
+## Configure repository secrets
+
+The Azure identity and its role assignment already exist for this demo. In **Settings -> Secrets and variables -> Actions -> Secrets -> New repository secret**, add the following values:
+
+| Secret | Source |
+|---|---|
+| `AZURE_CLIENT_ID` | `az identity show -g rg-gh-maturity-demo-ci -n id-gh-maturity-demo-ci --subscription 05205f08-8cae-45d2-bf60-65805d367aa7 --query clientId -o tsv` |
+| `AZURE_TENANT_ID` | `16b3c013-d300-468d-ac64-7eda0820b6d3` |
+| `AZURE_SUBSCRIPTION_ID` | `05205f08-8cae-45d2-bf60-65805d367aa7` |
+| `AZURE_RESOURCE_GROUP` | `rg-gh-maturity-demo-977a` |
+| `AZURE_CONTAINER_APP` | `ca-gh-maturity-demo-977a` |
+| `AZURE_CONTAINER_REGISTRY` | `crghmaturitydemo977a` |
+| `AZURE_IMAGE_REPOSITORY` | `github-maturity-assessment` |
+| `AZURE_APP_URL` | `https://ca-gh-maturity-demo-977a.graybay-0e1df60d.eastus2.azurecontainerapps.io/` |
+
+These are configuration identifiers and a public endpoint, not client credentials, but they are stored as encrypted Actions Secrets as requested. Do not create `AZURE_CLIENT_SECRET`; authentication uses short-lived OIDC tokens.
+
+The caller explicitly passes only these eight secrets to the reusable release workflow. The public endpoint is supplied directly as `AZURE_APP_URL` to both deployment verification and the low-privilege smoke job, and checked against the actual deployed app. It is deliberately **not a cross-job output**: the hostname contains `AZURE_CONTAINER_APP`, so GitHub's secret-output protection could otherwise suppress it. No encoded-secret outputs or credential-bearing artifacts are used.
+
+Merge the Secrets workflow change before retrying CD; older workflow revisions still read Actions Variables.
+
+## Optional administrator setup/reconciliation script
 
 Prerequisites: Azure CLI and `gh`, authenticated to the intended Azure tenant/subscription and GitHub account. The operator must be able to create the separate identity resource group and assign Contributor (for example, Owner on this subscription), and be a GitHub repository administrator. No client secret, registry password, or PAT is created by the script.
 
@@ -40,11 +61,11 @@ From a checkout containing the reviewed PR changes:
 # Inspect the script and Bicep before running them.
 .\scripts\setup-azure-auth-for-pipeline.ps1 -WhatIf
 
-# This prompts before changing Azure permissions and repository variables.
+# Optional: prompts before reconciling Azure permissions and configuring repository secrets.
 .\scripts\setup-azure-auth-for-pipeline.ps1
 ```
 
-The script validates the existing app and registry, shows the scope, runs Bicep what-if, creates only the deployment identity/RBAC, and configures these **non-secret repository Actions variables**:
+The script validates the existing app and registry, shows the scope, runs Bicep what-if, reconciles the deployment identity/RBAC, and configures these **repository Actions Secrets**:
 
 ```text
 AZURE_CLIENT_ID
@@ -54,9 +75,10 @@ AZURE_RESOURCE_GROUP
 AZURE_CONTAINER_APP
 AZURE_CONTAINER_REGISTRY
 AZURE_IMAGE_REPOSITORY
+AZURE_APP_URL
 ```
 
-All values are read by the workflow, not hardcoded into it. Allow Azure role assignments to propagate before the first run. If variable configuration fails after Azure setup, the script exits with an error; rerun it with the same names to reconcile the idempotent Bicep and variables.
+All values are read by the workflow, not hardcoded into it. Allow Azure role assignments to propagate before the first run. If secret configuration fails after Azure setup, the script exits with an error; rerun it with the same names to reconcile the idempotent Bicep and secrets. Running the script is not required when the existing identity is used and the administrator enters the secrets manually.
 
 ## Merge, deploy, verify
 

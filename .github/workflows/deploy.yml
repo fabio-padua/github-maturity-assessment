@@ -45,3 +45,12 @@ jobs:
     uses: ./.github/workflows/deploy-azure.yml
     with:
       source_sha: ${{ needs.gate.outputs.sha }}
+    secrets:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+      AZURE_CONTAINER_APP: ${{ secrets.AZURE_CONTAINER_APP }}
+      AZURE_CONTAINER_REGISTRY: ${{ secrets.AZURE_CONTAINER_REGISTRY }}
+      AZURE_IMAGE_REPOSITORY: ${{ secrets.AZURE_IMAGE_REPOSITORY }}
+      AZURE_APP_URL: ${{ secrets.AZURE_APP_URL }}

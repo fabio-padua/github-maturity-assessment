@@ -141,6 +141,13 @@ export function verifyBuild(info, sha) {
   if (info?.commit !== assertSha(sha)) throw new Error('The live endpoint is serving a different build commit.')
 }
 
+export function verifyEndpoint(actual, configured) {
+  const expected = new URL(configured)
+  if (expected.protocol !== 'https:' || expected.href !== new URL(actual).href) {
+    throw new Error('AZURE_APP_URL must match the deployed Container App HTTPS endpoint.')
+  }
+}
+
 async function health(url, sha) {
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
@@ -191,17 +198,19 @@ async function main(command) {
     if (!current) summary('Container App not updated: a newer main commit arrived during the build. The built image remains in ACR.')
   } else if (command === 'configuration') {
     for (const name of ['AZURE_CLIENT_ID', 'AZURE_TENANT_ID', 'AZURE_SUBSCRIPTION_ID', 'AZURE_RESOURCE_GROUP',
-      'AZURE_CONTAINER_APP', 'AZURE_CONTAINER_REGISTRY', 'AZURE_IMAGE_REPOSITORY']) required(name)
+      'AZURE_CONTAINER_APP', 'AZURE_CONTAINER_REGISTRY', 'AZURE_IMAGE_REPOSITORY', 'ASSESSMENT_URL']) required(name)
+    if (new URL(required('ASSESSMENT_URL')).protocol !== 'https:') throw new Error('AZURE_APP_URL must use HTTPS.')
     assertSha(required('SOURCE_SHA'))
   } else if (command === 'parameters') {
     const temp = required('RUNNER_TEMP')
     const app = JSON.parse(readFileSync(resolve(temp, 'container-app.json'), 'utf8'))
     const registry = JSON.parse(readFileSync(resolve(temp, 'registry.json'), 'utf8'))
     const parameters = deploymentParameters(app, registry, required('CONTAINER_IMAGE'))
+    verifyEndpoint(`https://${app.properties.configuration.ingress.fqdn}/`, required('ASSESSMENT_URL'))
     writeFileSync(resolve(temp, 'deploy.parameters.json'), JSON.stringify(parameters))
   } else if (command === 'ready') {
     const app = JSON.parse(readFileSync(resolve(required('RUNNER_TEMP'), 'deployed-app.json'), 'utf8'))
-    output('url', readyEndpoint(app, required('CONTAINER_IMAGE')))
+    verifyEndpoint(readyEndpoint(app, required('CONTAINER_IMAGE')), required('ASSESSMENT_URL'))
     output('deployed', 'true')
   } else if (command === 'health') {
     const url = new URL(required('ASSESSMENT_URL'))

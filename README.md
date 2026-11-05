@@ -135,7 +135,9 @@ Estimated cost is **US$5-6/month at low demo traffic**, not a spending cap. The 
 
 `.github/workflows/deploy.yml` gates the **latest successful `main` CI commit**, never a PR build. Only eligible runs enter a serialized release calling `deploy-azure.yml`; the lock covers both deployment and separate low-privilege live smoke checks. Failed or stale CI events cannot replace a pending eligible release. It uses OIDC, a separate managed identity, uniquely tagged ACR builds and immutable image digests, then checks the live build commit and all three language workflows on desktop/mobile. Main is rechecked before updating the Container App.
 
-**One-time administrator configuration is required before the first deployment.** Follow [.azure/pipeline-setup.md](.azure/pipeline-setup.md) and review `scripts/setup-azure-auth-for-pipeline.ps1`. The script creates only the dedicated deployment identity and scoped permissions, and sets repository Actions variables. It is not run by opening this PR, CI, or CD. No passwords are required. Missing configuration fails explicitly.
+**Repository Actions Secrets must be configured before deployment.** The dedicated Azure deployment identity and scoped role were created on 2026-11-05. Follow [.azure/pipeline-setup.md](.azure/pipeline-setup.md) to enter the eight repository secrets manually. The optional `scripts/setup-azure-auth-for-pipeline.ps1` reconciles the identity/permissions and configures those secrets; it is not run by CI or CD. No client secret or password is required. Missing configuration fails explicitly.
+
+The workflow explicitly passes repository Secrets to its reusable release workflow, rather than reading Actions Variables. `AZURE_APP_URL` goes directly to the smoke job instead of a secret-derived job output, preventing GitHub's output redaction from dropping the endpoint. The deployed endpoint must match that configured URL.
 
 The current private personal repository is on GitHub Free: this enables automated deployment after CI but does **not** enforce PR/review or paid deployment-environment approvals. The setup documentation explains the main-ref federation and upgrade path.
 
