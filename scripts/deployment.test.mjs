@@ -4,7 +4,7 @@ import { readFileSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { deploymentCandidate, isCurrentCommit, successfulMainRun, deploymentParameters, readyEndpoint, verifyBuild } from './deployment.mjs'
+import { deploymentCandidate, isCurrentCommit, successfulMainRun, assertPublicDemoIngress, deploymentParameters, readyEndpoint, verifyBuild } from './deployment.mjs'
 
 const sha = 'a'.repeat(40)
 const newer = 'b'.repeat(40)
@@ -57,7 +57,10 @@ const app = {
     provisioningState: 'Succeeded', latestRevisionName: 'new-revision', latestReadyRevisionName: 'new-revision',
     configuration: {
       registries: [{ server: registry.loginServer, identity }],
-      secrets: [], ingress: { allowInsecure: false, fqdn: 'demo.example.azurecontainerapps.io' },
+      secrets: [], ingress: {
+        external: true, allowInsecure: false, targetPort: 8080, exposedPort: 0, transport: 'Auto',
+        fqdn: 'demo.example.azurecontainerapps.io',
+      },
     },
     template: { containers: [{ image }] },
   },
@@ -84,6 +87,41 @@ test('deployment rejects mutable/foreign images and unknown configuration rather
   multipleIdentities.identity.userAssignedIdentities['other-identity'] = {}
   assert.throws(() => deploymentParameters(multipleIdentities, registry, image), /single managed identity/)
   assert.throws(() => deploymentParameters(app, { ...registry, id: registry.id.replace('/demo/', '/other/') }, image), /application resource group/)
+})
+
+test('restricted ingress is rejected before deployment parameters can broaden access', () => {
+  for (const change of [
+    { external: false }, { allowInsecure: true },
+    { ipSecurityRestrictions: [{ name: 'office', action: 'Allow', ipAddressRange: '192.0.2.0/24' }] },
+    { ipSecurityRestrictions: [{ name: 'blocked', action: 'Deny', ipAddressRange: '198.51.100.0/24' }] },
+    { ipSecurityRestrictions: {} }, { clientCertificateMode: 'Require' },
+    { clientCertificateMode: 'Accept' }, { targetPort: 80 }, { transport: 'tcp', exposedPort: 9000 },
+    { customDomains: [{ name: 'demo.example.com' }] },
+    { additionalPortMappings: [{ targetPort: 9000, external: false }] },
+    { corsPolicy: { allowedOrigins: ['https://demo.example.com'] } },
+    { stickySessions: { affinity: 'sticky' } },
+  ]) {
+    const restricted = structuredClone(app)
+    Object.assign(restricted.properties.configuration.ingress, change)
+    const before = structuredClone(restricted)
+    assert.throws(() => deploymentParameters(restricted, registry, image), /ingress|certificate/)
+    assert.throws(() => readyEndpoint(restricted, image), /ingress|certificate/)
+    assert.deepEqual(restricted, before)
+  }
+})
+
+test('the existing Azure public-demo defaults remain deployable', () => {
+  const existing = structuredClone(app)
+  Object.assign(existing.properties.configuration.ingress, {
+    clientCertificateMode: null, customDomains: null, ipSecurityRestrictions: null,
+    additionalPortMappings: null, corsPolicy: null, stickySessions: null,
+  })
+  assert.doesNotThrow(() => deploymentParameters(existing, registry, image))
+  Object.assign(existing.properties.configuration.ingress, {
+    clientCertificateMode: 'Ignore', customDomains: [], ipSecurityRestrictions: [],
+    additionalPortMappings: [], stickySessions: { affinity: 'none' },
+  })
+  assert.doesNotThrow(() => assertPublicDemoIngress(existing))
 })
 
 test('ready endpoint requires the expected ready image and HTTPS', () => {
@@ -120,19 +158,33 @@ test('the Docker build stamp records the exact commit and rejects invalid build 
   }
 })
 
-test('workflow separates privileged CD from CI and live smoke tests', () => {
-  const workflow = readFileSync(new URL('../.github/workflows/deploy.yml', import.meta.url), 'utf8')
-  assert.match(workflow, /workflow_run:/)
-  assert.doesNotMatch(workflow, /pull_request:/)
-  assert.match(workflow, /cancel-in-progress: false/)
+test('only the eligible release job serializes deployment through completion of live smoke checks', () => {
+  const entry = readFileSync(new URL('../.github/workflows/deploy.yml', import.meta.url), 'utf8')
+  const workflow = readFileSync(new URL('../.github/workflows/deploy-azure.yml', import.meta.url), 'utf8')
+  assert.match(entry, /workflow_run:/)
+  assert.doesNotMatch(entry, /pull_request:|^concurrency:/m)
+  const [gate, release] = entry.split('\n  release:')
+  assert.doesNotMatch(gate, /concurrency:|id-token: write/)
+  assert.match(release, /needs: gate/)
+  assert.match(release, /if: needs\.gate\.outputs\.eligible == 'true'/)
+  assert.match(release, /concurrency:\s+group: azure-demo-deployment\s+cancel-in-progress: false/)
+  assert.match(release, /uses: \.\/\.github\/workflows\/deploy-azure\.yml/)
+  assert.match(release, /source_sha: \$\{\{ needs\.gate\.outputs\.sha \}\}/)
+  assert.match(workflow, /workflow_call:/)
+  assert.doesNotMatch(workflow, /workflow_run:|workflow_dispatch:|pull_request:|concurrency:/)
+  assert.match(workflow, /ref: \$\{\{ inputs\.source_sha \}\}/)
   assert.match(workflow, /persist-credentials: false/)
-  assert.match(workflow, /ref: \$\{\{ needs\.gate\.outputs\.sha \}\}/)
   assert.match(workflow, /azure\/login@v2/)
   assert.match(workflow, /--template-file infra\/deploy\.bicep/)
   assert.match(workflow, /if: steps\.current\.outputs\.current == 'true'/)
   assert.match(workflow, /--build-arg "SOURCE_SHA=\$\{SOURCE_SHA\}"/)
+  const apply = workflow.split('      - name: Refresh ingress, deploy and verify the ready revision')[1]
+  assert.ok(apply.indexOf('node scripts/deployment.mjs parameters') < apply.indexOf('az deployment group create'))
+  assert.ok(apply.indexOf('> "$RUNNER_TEMP/container-app.json"') < apply.indexOf('node scripts/deployment.mjs parameters'))
   const smoke = workflow.split('\n  smoke:')[1]
   assert.ok(smoke)
+  assert.match(smoke, /needs: deploy/)
+  assert.match(smoke, /if: needs\.deploy\.outputs\.deployed == 'true'/)
   assert.doesNotMatch(smoke, /id-token: write|azure\/login/)
   assert.match(smoke, /npm run test:deployed/)
   const deployedConfig = readFileSync(new URL('../playwright.deployed.config.ts', import.meta.url), 'utf8')

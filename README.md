@@ -133,7 +133,7 @@ Estimated cost is **US$5-6/month at low demo traffic**, not a spending cap. The 
 
 ### Continuous deployment
 
-`.github/workflows/deploy.yml` deploys the **latest successful `main` CI commit**, never a PR build. It uses OIDC, a separate managed identity, uniquely tagged ACR builds and immutable image digests, then checks the live build commit and all three language workflows on desktop/mobile. Deployments are serialized; main is rechecked before updating the Container App.
+`.github/workflows/deploy.yml` gates the **latest successful `main` CI commit**, never a PR build. Only eligible runs enter a serialized release calling `deploy-azure.yml`; the lock covers both deployment and separate low-privilege live smoke checks. Failed or stale CI events cannot replace a pending eligible release. It uses OIDC, a separate managed identity, uniquely tagged ACR builds and immutable image digests, then checks the live build commit and all three language workflows on desktop/mobile. Main is rechecked before updating the Container App.
 
 **One-time administrator configuration is required before the first deployment.** Follow [.azure/pipeline-setup.md](.azure/pipeline-setup.md) and review `scripts/setup-azure-auth-for-pipeline.ps1`. The script creates only the dedicated deployment identity and scoped permissions, and sets repository Actions variables. It is not run by opening this PR, CI, or CD. No passwords are required. Missing configuration fails explicitly.
 
@@ -158,6 +158,8 @@ az deployment sub create --subscription $sub --location eastus2 --template-file 
 Keep the real image parameter on every deployment. `infra/main.parameters.json` is pinned to the initially deployed SHA image; the command above overrides it with the new commit. The generic Bicep default placeholder is only for first-time infrastructure bootstrapping.
 
 The image publishes `build-info.json` with its source commit for live verification. Automated CD uses only `infra/deploy.bicep`, updating the existing Container App without reprovisioning the environment/registry or assigning roles. The operator command above reapplies the whole infrastructure and needs broader permissions; it is not the CD identity's deployment path. If Docker is built locally without `SOURCE_SHA`, the metadata is marked `unknown`, which automated smoke checks reject.
+
+The CD wrapper deliberately supports only the existing unrestricted, HTTPS-only public-demo ingress. It rejects internal ingress, IP restrictions, client-certificate requirements and incompatible ingress customizations before applying the fixed template, and refreshes that check immediately before deployment. Supporting restricted hosting requires a reviewed template change that preserves those controls, not disabling them.
 
 Delete the dedicated demo resource group when no longer needed; this permanently removes the app, environment, registry images, and managed identity:
 

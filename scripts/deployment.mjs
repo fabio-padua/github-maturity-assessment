@@ -68,11 +68,33 @@ function resourceName(id, type, prefix) {
   return name
 }
 
+export function assertPublicDemoIngress(app) {
+  const ingress = app.properties?.configuration?.ingress
+  if (ingress?.external !== true || ingress.allowInsecure !== false) {
+    throw new Error('Expected the existing HTTPS-only public demo ingress; internal or insecure ingress cannot use this template.')
+  }
+  for (const setting of ['ipSecurityRestrictions', 'customDomains', 'additionalPortMappings']) {
+    if (ingress[setting] != null && (!Array.isArray(ingress[setting]) || ingress[setting].length)) {
+      throw new Error(`Deployment stopped: the public-demo template would overwrite ingress ${setting}.`)
+    }
+  }
+  if (ingress.clientCertificateMode != null && ingress.clientCertificateMode.toLowerCase() !== 'ignore') {
+    throw new Error('Deployment stopped: the public-demo template would overwrite client certificate requirements.')
+  }
+  if (ingress.targetPort !== 8080 || (ingress.exposedPort != null && ingress.exposedPort !== 0)
+    || (ingress.transport != null && ingress.transport.toLowerCase() !== 'auto')
+    || ingress.corsPolicy != null
+    || (ingress.stickySessions != null && ingress.stickySessions.affinity?.toLowerCase() !== 'none')) {
+    throw new Error('Deployment stopped: ingress differs from the supported public-demo template.')
+  }
+}
+
 export function deploymentParameters(app, registry, image) {
   const prefix = groupPrefix(app.id)
   if (app.type?.toLowerCase() !== 'microsoft.app/containerapps' || !app.name || !app.location) {
     throw new Error('Expected an existing Container App.')
   }
+  assertPublicDemoIngress(app)
   const registryName = resourceName(registry.id, 'Microsoft.ContainerRegistry/registries', prefix)
   const server = registry.loginServer
   if (!server || !image?.startsWith(`${server}/`) || !/@sha256:[a-f0-9]{64}$/.test(image)) {
@@ -108,7 +130,8 @@ export function readyEndpoint(app, image) {
   const p = app.properties
   if (p?.provisioningState !== 'Succeeded' || !p.latestRevisionName || p.latestReadyRevisionName !== p.latestRevisionName
     || p.template?.containers?.[0]?.image !== image) throw new Error('The expected image does not have a ready revision.')
-  if (p.configuration?.ingress?.allowInsecure !== false || !p.configuration.ingress.fqdn?.endsWith('.azurecontainerapps.io')) {
+  assertPublicDemoIngress(app)
+  if (!p.configuration.ingress.fqdn?.endsWith('.azurecontainerapps.io')) {
     throw new Error('Expected the existing HTTPS-only Container Apps endpoint.')
   }
   return `https://${p.configuration.ingress.fqdn}/`
