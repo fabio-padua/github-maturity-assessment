@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { deploymentCandidate, isCurrentCommit, successfulMainRun, assertPublicDemoIngress, deploymentParameters, readyEndpoint, verifyBuild, verifyEndpoint, githubFederationSubject } from './deployment.mjs'
+import { deploymentCandidate, isCurrentCommit, successfulMainRun, assertPublicDemoIngress, deploymentParameters, readyEndpoint, waitForReady, verifyBuild, verifyEndpoint, githubFederationSubject } from './deployment.mjs'
 
 const sha = 'a'.repeat(40)
 const newer = 'b'.repeat(40)
@@ -178,6 +178,32 @@ test('ready endpoint requires the expected ready image and HTTPS', () => {
   assert.throws(() => readyEndpoint(insecure, image), /HTTPS-only/)
 })
 
+test('readiness waits for fresh target-image state without weakening ingress checks', async () => {
+  const pending = structuredClone(app)
+  pending.properties.latestReadyRevisionName = 'previous-revision'
+  let reads = 0
+  let pauses = 0
+  const endpoint = await waitForReady(() => ++reads === 1 ? pending : app, image, {
+    attempts: 3, pause: async () => { pauses++ },
+  })
+  assert.equal(endpoint, readyEndpoint(app, image))
+  assert.equal(reads, 2)
+  assert.equal(pauses, 1)
+  const restricted = structuredClone(pending)
+  restricted.properties.configuration.ingress.external = false
+  await assert.rejects(() => waitForReady(() => restricted, image, { pause: async () => {} }), /HTTPS-only/)
+})
+
+test('readiness polling is bounded and never accepts an older image', async () => {
+  const previous = structuredClone(app)
+  previous.properties.template.containers[0].image = 'older-image'
+  let reads = 0
+  await assert.rejects(() => waitForReady(() => { reads++; return previous }, image, {
+    attempts: 2, pause: async () => {},
+  }), /Timed out/)
+  assert.equal(reads, 2)
+})
+
 test('the served build identity must match the tested commit', () => {
   assert.doesNotThrow(() => verifyBuild({ commit: sha }, sha))
   assert.throws(() => verifyBuild({ commit: newer }, sha), /different build/)
@@ -231,6 +257,7 @@ test('only the eligible release job serializes deployment through completion of 
   assert.match(workflow, /--template-file infra\/deploy\.bicep/)
   assert.match(workflow, /if: steps\.current\.outputs\.current == 'true'/)
   assert.match(workflow, /--build-arg "SOURCE_SHA=\$\{SOURCE_SHA\}"/)
+  assert.match(workflow, /node scripts\/deployment\.mjs wait-ready/)
   const apply = workflow.split('      - name: Refresh ingress, deploy and verify the ready revision')[1]
   assert.ok(apply.indexOf('node scripts/deployment.mjs parameters') < apply.indexOf('az deployment group create'))
   assert.ok(apply.indexOf('> "$RUNNER_TEMP/container-app.json"') < apply.indexOf('node scripts/deployment.mjs parameters'))

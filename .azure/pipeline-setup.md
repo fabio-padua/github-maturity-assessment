@@ -58,7 +58,7 @@ No script execution, PR creation or merge automatically fills repository Secrets
 3. Only an eligible release acquires the concurrency lock. The reusable workflow retains that lock through deployment and the separate low-privilege smoke job; no duplicate lock exists inside it.
 4. OIDC signs in as the dedicated identity. ACR builds the verified source with a unique SHA/run/attempt tag; deployment uses the immutable digest.
 5. Main and live ingress are rechecked before applying Bicep. Internal ingress, IP restrictions, client-certificate requirements and incompatible ingress customizations stop CD rather than being cleared. Extend the template through review to preserve those controls; do not remove restrictions to make CD pass.
-6. The smoke job verifies HTTPS, the actual build commit, all three language workflows, report precision and refresh-to-reset behavior. It has no Azure OIDC permission and never starts a local fallback server.
+6. After ARM deployment completes, bounded polling waits for a fresh read of the target image's ready revision; deployment completion alone is not readiness. Ingress checks remain enforced, and an older image or timeout fails the run. The smoke job then verifies HTTPS, the actual build commit, all three language workflows, report precision and refresh-to-reset behavior. It has no Azure OIDC permission and never starts a local fallback server.
 
 Only the existing demo is targeted. The code deployment wrapper does not reprovision the registry/environment or grant roles. Failure produces a failed Actions run and diagnostic artifacts; it never silently rolls back, deletes resources, changes regions/SKUs or disables HTTPS.
 

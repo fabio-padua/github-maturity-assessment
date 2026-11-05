@@ -138,12 +138,7 @@ jobs:
             echo "::error::Container App deployment failed: $state"
             exit 1
           fi
-          az resource show --subscription "$AZURE_SUBSCRIPTION_ID" \
-            --resource-group "$AZURE_RESOURCE_GROUP" \
-            --resource-type Microsoft.App/containerApps \
-            --name "$AZURE_CONTAINER_APP" --api-version 2026-07-01 \
-            --output json > "$RUNNER_TEMP/deployed-app.json"
-          node scripts/deployment.mjs ready
+          node scripts/deployment.mjs wait-ready
 
   smoke:
     needs: deploy
