@@ -16,7 +16,7 @@ npm run test:demo
 
 `.env.demo` enables `VITE_DEMO_MODE=true` at build time. The ordinary local development/build mode below retains the original consultant-led browser-saving behavior.
 
-**Live Azure demo:** [Open the GitHub maturity assessment](https://ca-gh-maturity-demo-977a.graybay-0e1df60d.eastus2.azurecontainerapps.io/).
+**Live Azure demo:** use the endpoint configured in the `AZURE_APP_URL` repository secret.
 
 ## Run locally
 
@@ -127,7 +127,7 @@ React + TypeScript + Vite. Vitest covers scoring, validation, and reports. Playw
 
 ## Azure deployment
 
-The public demo runs in the **MCAPS-Hybrid-REQ-46931-2022-fabiopadua** subscription, resource group `rg-gh-maturity-demo-977a`, in **East US 2**. Images are built remotely in ACR; local Docker is not required. Registry admin credentials are disabled, and the app pulls images with managed identity.
+The public demo runs in the Azure target configured through repository Actions Secrets. Do not commit the actual tenant, subscription, resource identifiers or endpoint to documentation. Images are built remotely in ACR; local Docker is not required. Registry admin credentials are disabled, and the app pulls images with managed identity.
 
 Estimated cost is **US$5-6/month at low demo traffic**, not a spending cap. The Basic registry remains billable while compute scales to zero. Build compute, excess storage, egress, taxes, and unexpected traffic are excluded. Initial requests after idling may have a cold start.
 
@@ -147,14 +147,18 @@ To retry after setup or a failed deployment, dispatch **Deploy Azure demo** from
 
 After committing code changes, an authorized operator can still redeploy from the repository root in PowerShell:
 
+Supply the intended target values through local environment variables; never save those values into this document. The manual path also needs `AZURE_LOCATION`. It reads the original creation tag from the existing resource group rather than overwriting it with a documented literal.
+
 ```powershell
-$sub = '05205f08-8cae-45d2-bf60-65805d367aa7'
-$registry = 'crghmaturitydemo977a'
+$sub = $env:AZURE_SUBSCRIPTION_ID
+$registry = $env:AZURE_CONTAINER_REGISTRY
+$imageRepository = $env:AZURE_IMAGE_REPOSITORY
 $tag = git rev-parse HEAD
 $deployedBy = az account show --subscription $sub --query user.name -o tsv
-az acr build --subscription $sub --registry $registry --image "github-maturity-assessment:$tag" --image github-maturity-assessment:demo --file infra\Dockerfile --build-arg "SOURCE_SHA=$tag" . --no-logs
+$createdAt = az group show --subscription $sub --name $env:AZURE_RESOURCE_GROUP --query 'tags."created-at"' -o tsv
+az acr build --subscription $sub --registry $registry --image "${imageRepository}:$tag" --file infra\Dockerfile --build-arg "SOURCE_SHA=$tag" . --no-logs
 if ($LASTEXITCODE -ne 0) { throw 'Image build failed; deployment not started.' }
-az deployment sub create --subscription $sub --location eastus2 --template-file infra\main.bicep --parameters '@infra\main.parameters.json' "containerImage=${registry}.azurecr.io/github-maturity-assessment:$tag" "deployedBy=$deployedBy" 'createdAt=2026-10-29T16:18:33.2653722Z' --name gh-maturity-demo-code --query properties.provisioningState -o tsv
+az deployment sub create --subscription $sub --location $env:AZURE_LOCATION --template-file infra\main.bicep --parameters '@infra\main.parameters.json' "containerImage=${registry}.azurecr.io/${imageRepository}:$tag" "deployedBy=$deployedBy" "createdAt=$createdAt" --name demo-code --query properties.provisioningState -o tsv
 ```
 
 Keep the real image parameter on every deployment. `infra/main.parameters.json` is pinned to the initially deployed SHA image; the command above overrides it with the new commit. The generic Bicep default placeholder is only for first-time infrastructure bootstrapping.
@@ -166,7 +170,7 @@ The CD wrapper deliberately supports only the existing unrestricted, HTTPS-only 
 Delete the dedicated demo resource group when no longer needed; this permanently removes the app, environment, registry images, and managed identity:
 
 ```powershell
-az group delete --subscription 05205f08-8cae-45d2-bf60-65805d367aa7 --name rg-gh-maturity-demo-977a --yes --no-wait
+az group delete --subscription $env:AZURE_SUBSCRIPTION_ID --name $env:AZURE_RESOURCE_GROUP --yes --no-wait
 ```
 
 ## Reference material
