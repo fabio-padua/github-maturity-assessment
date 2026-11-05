@@ -1,0 +1,191 @@
+name: Deploy Azure demo
+
+on:
+  workflow_run:
+    workflows: [Quality checks]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: azure-demo-deployment
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      eligible: ${{ steps.gate.outputs.eligible }}
+      sha: ${{ steps.gate.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Require successful main CI for the latest commit
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/deployment.mjs gate
+
+  deploy:
+    needs: gate
+    if: needs.gate.outputs.eligible == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      SOURCE_SHA: ${{ needs.gate.outputs.sha }}
+      AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      AZURE_CONTAINER_APP: ${{ vars.AZURE_CONTAINER_APP }}
+      AZURE_CONTAINER_REGISTRY: ${{ vars.AZURE_CONTAINER_REGISTRY }}
+      AZURE_IMAGE_REPOSITORY: ${{ vars.AZURE_IMAGE_REPOSITORY }}
+    outputs:
+      deployed: ${{ steps.deploy.outputs.deployed }}
+      url: ${{ steps.deploy.outputs.url }}
+      sha: ${{ needs.gate.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check one-time Azure configuration
+        run: node scripts/deployment.mjs configuration
+      - name: Sign in with federated managed identity
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Build a uniquely tagged demo image in ACR
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${SOURCE_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          status=$(az acr build \
+            --subscription "$AZURE_SUBSCRIPTION_ID" \
+            --registry "$AZURE_CONTAINER_REGISTRY" \
+            --image "${AZURE_IMAGE_REPOSITORY}:${tag}" \
+            --file infra/Dockerfile \
+            --build-arg "SOURCE_SHA=${SOURCE_SHA}" \
+            --no-logs --query status --output tsv .)
+          if [[ "$status" != "Succeeded" ]]; then
+            echo "::error::ACR build did not succeed: $status"
+            exit 1
+          fi
+          server=$(az acr show --name "$AZURE_CONTAINER_REGISTRY" \
+            --subscription "$AZURE_SUBSCRIPTION_ID" --query loginServer --output tsv)
+          digest=$(az acr repository show --name "$AZURE_CONTAINER_REGISTRY" \
+            --subscription "$AZURE_SUBSCRIPTION_ID" \
+            --image "${AZURE_IMAGE_REPOSITORY}:${tag}" --query digest --output tsv)
+          if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+            echo "::error::ACR did not return a valid image digest."
+            exit 1
+          fi
+          echo "image=${server}/${AZURE_IMAGE_REPOSITORY}@${digest}" >> "$GITHUB_OUTPUT"
+      - name: Read the existing application configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          az resource show \
+            --subscription "$AZURE_SUBSCRIPTION_ID" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --resource-type Microsoft.App/containerApps \
+            --name "$AZURE_CONTAINER_APP" --api-version 2026-07-01 \
+            --output json > "$RUNNER_TEMP/container-app.json"
+          az acr show --subscription "$AZURE_SUBSCRIPTION_ID" \
+            --name "$AZURE_CONTAINER_REGISTRY" \
+            --output json > "$RUNNER_TEMP/registry.json"
+      - name: Prepare image-only Bicep parameters
+        env:
+          CONTAINER_IMAGE: ${{ steps.image.outputs.image }}
+        run: node scripts/deployment.mjs parameters
+      - name: Recheck main immediately before changing Azure
+        id: current
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/deployment.mjs current
+      - name: Deploy and verify the ready revision
+        id: deploy
+        if: steps.current.outputs.current == 'true'
+        shell: bash
+        env:
+          CONTAINER_IMAGE: ${{ steps.image.outputs.image }}
+        run: |
+          set -euo pipefail
+          state=$(az deployment group create \
+            --subscription "$AZURE_SUBSCRIPTION_ID" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "demo-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --template-file infra/deploy.bicep \
+            --parameters "@${RUNNER_TEMP}/deploy.parameters.json" \
+            --query properties.provisioningState --output tsv)
+          if [[ "$state" != "Succeeded" ]]; then
+            echo "::error::Container App deployment failed: $state"
+            exit 1
+          fi
+          az resource show --subscription "$AZURE_SUBSCRIPTION_ID" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --resource-type Microsoft.App/containerApps \
+            --name "$AZURE_CONTAINER_APP" --api-version 2026-07-01 \
+            --output json > "$RUNNER_TEMP/deployed-app.json"
+          node scripts/deployment.mjs ready
+
+  smoke:
+    needs: deploy
+    if: needs.deploy.outputs.deployed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      ASSESSMENT_URL: ${{ needs.deploy.outputs.url }}
+      SOURCE_SHA: ${{ needs.deploy.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.deploy.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Verify HTTPS and the served build commit
+        run: node scripts/deployment.mjs health
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Exercise the actual deployed demo in all three languages
+        run: npm run test:deployed
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: deployed-demo-test-results
+          path: test-results
+          retention-days: 7
+      - name: Record successful deployment
+        shell: bash
+        run: |
+          {
+            echo "### Azure demo deployed"
+            echo "- Commit: \`$SOURCE_SHA\`"
+            echo "- URL: $ASSESSMENT_URL"
+            echo "- HTTPS, build identity, language switching, reports and session-only behavior verified."
+          } >> "$GITHUB_STEP_SUMMARY"
