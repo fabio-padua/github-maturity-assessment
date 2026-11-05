@@ -4,7 +4,7 @@ import { readFileSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { deploymentCandidate, isCurrentCommit, successfulMainRun, assertPublicDemoIngress, deploymentParameters, readyEndpoint, verifyBuild } from './deployment.mjs'
+import { deploymentCandidate, isCurrentCommit, successfulMainRun, assertPublicDemoIngress, deploymentParameters, readyEndpoint, verifyBuild, verifyEndpoint } from './deployment.mjs'
 
 const sha = 'a'.repeat(40)
 const newer = 'b'.repeat(40)
@@ -141,6 +141,16 @@ test('the served build identity must match the tested commit', () => {
   assert.throws(() => verifyBuild({ commit: 'unknown' }, sha), /different build/)
 })
 
+test('the configured secret endpoint must match the actual deployed HTTPS endpoint', () => {
+  const endpoint = readyEndpoint(app, image)
+  assert.doesNotThrow(() => verifyEndpoint(endpoint, endpoint))
+  assert.doesNotThrow(() => verifyEndpoint(endpoint, endpoint.slice(0, -1)))
+  for (const other of ['http://demo.example.azurecontainerapps.io/', 'https://other.example.azurecontainerapps.io/',
+    `${endpoint}different-path`, `${endpoint}?different-query`]) {
+    assert.throws(() => verifyEndpoint(endpoint, other), /AZURE_APP_URL/)
+  }
+})
+
 test('the Docker build stamp records the exact commit and rejects invalid build arguments', () => {
   const dockerfile = readFileSync(new URL('../infra/Dockerfile', import.meta.url), 'utf8')
   const code = /^RUN node -e "(.*)"$/m.exec(dockerfile)?.[1]
@@ -190,4 +200,25 @@ test('only the eligible release job serializes deployment through completion of 
   const deployedConfig = readFileSync(new URL('../playwright.deployed.config.ts', import.meta.url), 'utf8')
   assert.match(deployedConfig, /webServer: undefined/)
   assert.match(deployedConfig, /protocol !== 'https:'/)
+})
+
+test('Azure secrets are explicitly passed to the reusable workflow without secret-derived job outputs', () => {
+  const entry = readFileSync(new URL('../.github/workflows/deploy.yml', import.meta.url), 'utf8')
+  const workflow = readFileSync(new URL('../.github/workflows/deploy-azure.yml', import.meta.url), 'utf8')
+  const setup = readFileSync(new URL('./setup-azure-auth-for-pipeline.ps1', import.meta.url), 'utf8')
+  const declaredSecrets = workflow.split('    secrets:')[1].split('\npermissions:')[0]
+  for (const key of ['AZURE_CLIENT_ID', 'AZURE_TENANT_ID', 'AZURE_SUBSCRIPTION_ID', 'AZURE_RESOURCE_GROUP',
+    'AZURE_CONTAINER_APP', 'AZURE_CONTAINER_REGISTRY', 'AZURE_IMAGE_REPOSITORY', 'AZURE_APP_URL']) {
+    assert.ok(entry.includes(`${key}: \${{ secrets.${key} }}`), `Caller must explicitly pass ${key}`)
+    assert.match(declaredSecrets, new RegExp(`${key}:\\s+required: true`))
+    assert.ok(workflow.includes(`\${{ secrets.${key} }}`), `Callee must consume ${key}`)
+  }
+  assert.doesNotMatch(entry + workflow, /\bvars\./)
+  assert.doesNotMatch(entry, /secrets: inherit/)
+  assert.doesNotMatch(workflow, /outputs\.url/)
+  const smoke = workflow.split('\n  smoke:')[1]
+  assert.match(smoke, /ASSESSMENT_URL: \$\{\{ secrets\.AZURE_APP_URL \}\}/)
+  assert.doesNotMatch(smoke, /echo.*\$ASSESSMENT_URL/)
+  assert.match(setup, /'secret', 'set'/)
+  assert.doesNotMatch(setup, /'variable', 'set'/)
 })

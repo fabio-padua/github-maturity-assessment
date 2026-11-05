@@ -27,11 +27,13 @@ if ($Repository -notmatch '^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$') { throw 'Expected
 
 $account = Invoke-Checked az @('account', 'show', '--subscription', $SubscriptionId, '-o', 'json') | ConvertFrom-Json
 $repo = Invoke-Checked gh @('repo', 'view', $Repository, '--json', 'viewerPermission') | ConvertFrom-Json
-if ($repo.viewerPermission -ne 'ADMIN') { throw 'Repository administrator permission is required to set Actions variables.' }
+if ($repo.viewerPermission -ne 'ADMIN') { throw 'Repository administrator permission is required to set Actions secrets.' }
 $null = Invoke-Checked az @('group', 'show', '-n', $ApplicationResourceGroup, '--subscription', $SubscriptionId, '-o', 'none')
-$null = Invoke-Checked az @('resource', 'show', '--resource-group', $ApplicationResourceGroup,
+$application = Invoke-Checked az @('resource', 'show', '--resource-group', $ApplicationResourceGroup,
   '--name', $ContainerApp, '--resource-type', 'Microsoft.App/containerApps',
-  '--api-version', '2026-07-01', '--subscription', $SubscriptionId, '-o', 'none')
+  '--api-version', '2026-07-01', '--subscription', $SubscriptionId, '-o', 'json') | ConvertFrom-Json
+if (-not $application.properties.configuration.ingress.fqdn) { throw 'The Container App has no ingress endpoint.' }
+$applicationUrl = "https://$($application.properties.configuration.ingress.fqdn)/"
 $registryResource = Invoke-Checked az @('acr', 'show', '-n', $Registry, '--subscription', $SubscriptionId, '-o', 'json') | ConvertFrom-Json
 if ($registryResource.id -notlike "*/resourceGroups/$ApplicationResourceGroup/*") {
   throw 'The configured registry must be inside the application resource group.'
@@ -50,7 +52,7 @@ $parameters = @('--parameters', "identityResourceGroupName=$IdentityResourceGrou
   "applicationResourceGroupName=$ApplicationResourceGroup", "repository=$Repository", "location=$Location")
 Invoke-Checked az (@('deployment', 'sub', 'what-if', '--subscription', $SubscriptionId,
   '--location', $Location, '--template-file', $template) + $parameters) | Out-Host
-if (-not $PSCmdlet.ShouldProcess($Repository, 'Create Azure deployment identity, grant scoped access and configure Actions variables')) {
+if (-not $PSCmdlet.ShouldProcess($Repository, 'Create Azure deployment identity, grant scoped access and configure Actions secrets')) {
   return
 }
 $result = Invoke-Checked az (@('deployment', 'sub', 'create', '--subscription', $SubscriptionId,
@@ -58,7 +60,7 @@ $result = Invoke-Checked az (@('deployment', 'sub', 'create', '--subscription', 
   '--query', 'properties.outputs', '-o', 'json') + $parameters) | ConvertFrom-Json
 if (-not $result.clientId.value -or -not $result.tenantId.value) { throw 'Azure did not return the pipeline identity IDs.' }
 
-$variables = @{
+$secrets = @{
   AZURE_CLIENT_ID = $result.clientId.value
   AZURE_TENANT_ID = $result.tenantId.value
   AZURE_SUBSCRIPTION_ID = $SubscriptionId
@@ -66,9 +68,10 @@ $variables = @{
   AZURE_CONTAINER_APP = $ContainerApp
   AZURE_CONTAINER_REGISTRY = $Registry
   AZURE_IMAGE_REPOSITORY = $ImageRepository
+  AZURE_APP_URL = $applicationUrl
 }
-foreach ($item in $variables.GetEnumerator()) {
-  $null = Invoke-Checked gh @('variable', 'set', $item.Key, '--repo', $Repository, '--body', [string] $item.Value)
+foreach ($item in $secrets.GetEnumerator()) {
+  $null = Invoke-Checked gh @('secret', 'set', $item.Key, '--repo', $Repository, '--body', [string] $item.Value)
 }
 Write-Host 'OIDC setup complete. Allow time for Azure RBAC propagation before the first deployment.'
 Write-Host 'After the workflow PR is merged and main CI succeeds, Deploy Azure demo runs automatically; no workflow is dispatched by this setup script.'
