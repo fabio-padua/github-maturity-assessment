@@ -131,19 +131,35 @@ The public demo runs in the **MCAPS-Hybrid-REQ-46931-2022-fabiopadua** subscript
 
 Estimated cost is **US$5-6/month at low demo traffic**, not a spending cap. The Basic registry remains billable while compute scales to zero. Build compute, excess storage, egress, taxes, and unexpected traffic are excluded. Initial requests after idling may have a cold start.
 
-After committing code changes, redeploy from the repository root in PowerShell:
+### Continuous deployment
+
+`.github/workflows/deploy.yml` gates the **latest successful `main` CI commit**, never a PR build. Only eligible runs enter a serialized release calling `deploy-azure.yml`; the lock covers both deployment and separate low-privilege live smoke checks. Failed or stale CI events cannot replace a pending eligible release. It uses OIDC, a separate managed identity, uniquely tagged ACR builds and immutable image digests, then checks the live build commit and all three language workflows on desktop/mobile. Main is rechecked before updating the Container App.
+
+**One-time administrator configuration is required before the first deployment.** Follow [.azure/pipeline-setup.md](.azure/pipeline-setup.md) and review `scripts/setup-azure-auth-for-pipeline.ps1`. The script creates only the dedicated deployment identity and scoped permissions, and sets repository Actions variables. It is not run by opening this PR, CI, or CD. No passwords are required. Missing configuration fails explicitly.
+
+The current private personal repository is on GitHub Free: this enables automated deployment after CI but does **not** enforce PR/review or paid deployment-environment approvals. The setup documentation explains the main-ref federation and upgrade path.
+
+To retry after setup or a failed deployment, dispatch **Deploy Azure demo** from `main`; successful CI for the latest main commit is still required. `npm run test:deployment` validates deployment gates and metadata handling. Set `$env:ASSESSMENT_URL = 'https://...'` in PowerShell, then run `npm run test:deployed` to exercise an already deployed site; it never starts a local fallback server.
+
+### Manual operator deployment
+
+After committing code changes, an authorized operator can still redeploy from the repository root in PowerShell:
 
 ```powershell
 $sub = '05205f08-8cae-45d2-bf60-65805d367aa7'
 $registry = 'crghmaturitydemo977a'
 $tag = git rev-parse HEAD
 $deployedBy = az account show --subscription $sub --query user.name -o tsv
-az acr build --subscription $sub --registry $registry --image "github-maturity-assessment:$tag" --image github-maturity-assessment:demo --file infra\Dockerfile . --no-logs
+az acr build --subscription $sub --registry $registry --image "github-maturity-assessment:$tag" --image github-maturity-assessment:demo --file infra\Dockerfile --build-arg "SOURCE_SHA=$tag" . --no-logs
 if ($LASTEXITCODE -ne 0) { throw 'Image build failed; deployment not started.' }
 az deployment sub create --subscription $sub --location eastus2 --template-file infra\main.bicep --parameters '@infra\main.parameters.json' "containerImage=${registry}.azurecr.io/github-maturity-assessment:$tag" "deployedBy=$deployedBy" 'createdAt=2026-10-29T16:18:33.2653722Z' --name gh-maturity-demo-code --query properties.provisioningState -o tsv
 ```
 
 Keep the real image parameter on every deployment. `infra/main.parameters.json` is pinned to the initially deployed SHA image; the command above overrides it with the new commit. The generic Bicep default placeholder is only for first-time infrastructure bootstrapping.
+
+The image publishes `build-info.json` with its source commit for live verification. Automated CD uses only `infra/deploy.bicep`, updating the existing Container App without reprovisioning the environment/registry or assigning roles. The operator command above reapplies the whole infrastructure and needs broader permissions; it is not the CD identity's deployment path. If Docker is built locally without `SOURCE_SHA`, the metadata is marked `unknown`, which automated smoke checks reject.
+
+The CD wrapper deliberately supports only the existing unrestricted, HTTPS-only public-demo ingress. It rejects internal ingress, IP restrictions, client-certificate requirements and incompatible ingress customizations before applying the fixed template, and refreshes that check immediately before deployment. Supporting restricted hosting requires a reviewed template change that preserves those controls, not disabling them.
 
 Delete the dedicated demo resource group when no longer needed; this permanently removes the app, environment, registry images, and managed identity:
 

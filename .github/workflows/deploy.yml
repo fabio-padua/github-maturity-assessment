@@ -1,0 +1,47 @@
+name: Deploy Azure demo
+
+on:
+  workflow_run:
+    workflows: [Quality checks]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      eligible: ${{ steps.gate.outputs.eligible }}
+      sha: ${{ steps.gate.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Require successful main CI for the latest commit
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/deployment.mjs gate
+
+  release:
+    needs: gate
+    if: needs.gate.outputs.eligible == 'true'
+    concurrency:
+      group: azure-demo-deployment
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/deploy-azure.yml
+    with:
+      source_sha: ${{ needs.gate.outputs.sha }}

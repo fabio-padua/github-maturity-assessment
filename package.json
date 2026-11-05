@@ -12,7 +12,9 @@
     "preview": "vite preview",
     "test": "vitest run src",
     "test:e2e": "playwright test",
-    "test:demo": "playwright test --config playwright.demo.config.ts"
+    "test:demo": "playwright test --config playwright.demo.config.ts",
+    "test:deployment": "node --test scripts/deployment.test.mjs",
+    "test:deployed": "playwright test --config playwright.deployed.config.ts"
   },
   "dependencies": {
     "react": "^19.3.1",
