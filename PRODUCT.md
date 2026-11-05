@@ -26,6 +26,8 @@ No hosted customer accounts, backend, or automatic GitHub data collection in the
 
 The user subsequently requested a public Azure demonstration in the MCAPS subscription, preferring Container Apps or App Service, with no assessment persistence. The hosted demo uses browser memory only and clears on refresh; the original local consultant mode remains available. East US 2 and public access with fictional/session-only data were confirmed.
 
+The full assessment supports English, Brazilian Portuguese, and Spanish through the user preferences menu. Language applies to UI, question content, generated recommendations, and report exports, without translating customer-authored input or changing the scoring/schema. Locale selection lives in the URL so demo assessments remain memory-only.
+
 ## Brand Commitments
 
 The supplied modernization-assessment image guides information architecture: current state, readiness, deliverables, and a recommended journey. Preserve its navy, blue, purple, and teal visual vocabulary without suggesting official GitHub certification.

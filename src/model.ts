@@ -1,5 +1,9 @@
+import { en } from './i18n/en'
 export type Rating = 0 | 1 | 2 | 3 | 4
-export type Answer = { value: Rating | 'na' | null; evidence: string }
+export type Answer = {
+  value: Rating | 'na' | null
+  evidence: string
+}
 export type Platform = 'github' | 'azure-devops' | 'mixed' | 'other'
 export type Assessment = {
   id: string
@@ -20,12 +24,17 @@ export type Assessment = {
   sample: boolean
   updatedAt: string
 }
-
 export type Question = {
   id: string
   title: string
   why: string
-  options: [string, string, string, string, string]
+  options: [
+    string,
+    string,
+    string,
+    string,
+    string
+  ]
   action: string
   evidence: string
   critical?: boolean
@@ -39,145 +48,141 @@ export type Pillar = {
   color: string
   questions: Question[]
 }
-
 export const pillars: Pillar[] = [
   {
-    id: 'governance', name: 'Enterprise & governance', short: 'Governance', weight: 20,
-    description: 'A controlled foundation for your organizations, identities, and repositories.', color: '#58a6ff',
+    id: 'governance', name: en["model.enterprise_governance"], short: en["ui.governance"], weight: 20,
+    description: en["model.a_controlled_foundation_for_your_organizations_identities_and_repositories"], color: '#58a6ff',
     questions: [
-      { id: 'identity', title: 'How is access to your development platform managed?', why: 'Central identity and joiner/mover/leaver controls reduce unauthorized access.',
-        options: ['Individual accounts; no consistent access policy', 'Documented access guidelines, applied manually', 'SSO and MFA enforced for most users', 'SSO, MFA, and automated provisioning enforced', 'Lifecycle controls continuously reviewed and audited'], critical: true,
-        action: 'Enforce SSO and MFA, define a joiner/mover/leaver process, and validate account deprovisioning.', evidence: 'Identity policy, SSO configuration, recent access review' },
-      { id: 'ownership', title: 'How clearly are organizations and repositories owned?', why: 'Ownership connects platform decisions to accountable people.',
-        options: ['No reliable inventory or ownership', 'Partial inventory; ownership is informal', 'Most repositories have owners and a purpose', 'Complete inventory, ownership, and lifecycle policies', 'Ownership and lifecycle compliance monitored automatically'],
-        action: 'Create a repository inventory with owners, purpose, sensitivity, and lifecycle status.', evidence: 'Repository inventory, ownership matrix' },
-      { id: 'policies', title: 'How are repository standards enforced?', why: 'Consistent guardrails make safe delivery repeatable.',
-        options: ['No common standards', 'Standards documented but optional', 'Branch rules and reviews on important repositories', 'Organization-wide rulesets and reusable templates', 'Policy-as-code with exceptions, monitoring, and review'],
-        action: 'Pilot shared rulesets for reviews, protected branches, and controlled exceptions.', evidence: 'Rulesets, repository templates, exception register' },
-      { id: 'audit', title: 'How are platform activity and permissions reviewed?', why: 'Auditability is needed to investigate incidents and demonstrate control.',
-        options: ['Logs and permissions are not reviewed', 'Ad hoc investigation when issues occur', 'Scheduled access reviews and retained audit logs', 'Audit logs integrated with monitoring and named owners', 'Automated detection, response, and control evidence'],
-        action: 'Assign an audit owner, set retention requirements, and schedule access reviews.', evidence: 'Audit retention policy, SIEM integration, access reviews' },
-      { id: 'licensing', title: 'How are GitHub and Copilot licenses governed?', why: 'License ownership and utilization make commercial planning credible.',
-        options: ['Seat counts and owners are unknown', 'Seats tracked manually without utilization reviews', 'Owners and periodic seat reconciliation established', 'Utilization and allocation reviewed with procurement', 'Forecasting and ongoing optimization tied to adoption'],
-        action: 'Reconcile assigned seats, active use, plan eligibility, and procurement ownership.', evidence: 'Seat inventory, utilization report, purchasing agreement' },
+      { id: 'identity', title: en["model.how_is_access_to_your_development_platform_managed"], why: en["model.central_identity_and_joiner_mover_leaver_controls_reduce_unauthorized"],
+        options: [en["model.individual_accounts_no_consistent_access_policy"], en["model.documented_access_guidelines_applied_manually"], en["model.sso_and_mfa_enforced_for_most_users"], en["model.sso_mfa_and_automated_provisioning_enforced"], en["model.lifecycle_controls_continuously_reviewed_and_audited"]], critical: true,
+        action: en["model.enforce_sso_and_mfa_define_a_joiner_mover_leaver"], evidence: en["model.identity_policy_sso_configuration_recent_access_review"] },
+      { id: 'ownership', title: en["model.how_clearly_are_organizations_and_repositories_owned"], why: en["model.ownership_connects_platform_decisions_to_accountable_people"],
+        options: [en["model.no_reliable_inventory_or_ownership"], en["model.partial_inventory_ownership_is_informal"], en["model.most_repositories_have_owners_and_a_purpose"], en["model.complete_inventory_ownership_and_lifecycle_policies"], en["model.ownership_and_lifecycle_compliance_monitored_automatically"]],
+        action: en["model.create_a_repository_inventory_with_owners_purpose_sensitivity_and"], evidence: en["model.repository_inventory_ownership_matrix"] },
+      { id: 'policies', title: en["model.how_are_repository_standards_enforced"], why: en["model.consistent_guardrails_make_safe_delivery_repeatable"],
+        options: [en["model.no_common_standards"], en["model.standards_documented_but_optional"], en["model.branch_rules_and_reviews_on_important_repositories"], en["model.organization_wide_rulesets_and_reusable_templates"], en["model.policy_as_code_with_exceptions_monitoring_and_review"]],
+        action: en["model.pilot_shared_rulesets_for_reviews_protected_branches_and_controlled"], evidence: en["model.rulesets_repository_templates_exception_register"] },
+      { id: 'audit', title: en["model.how_are_platform_activity_and_permissions_reviewed"], why: en["model.auditability_is_needed_to_investigate_incidents_and_demonstrate_control"],
+        options: [en["model.logs_and_permissions_are_not_reviewed"], en["model.ad_hoc_investigation_when_issues_occur"], en["model.scheduled_access_reviews_and_retained_audit_logs"], en["model.audit_logs_integrated_with_monitoring_and_named_owners"], en["model.automated_detection_response_and_control_evidence"]],
+        action: en["model.assign_an_audit_owner_set_retention_requirements_and_schedule"], evidence: en["model.audit_retention_policy_siem_integration_access_reviews"] },
+      { id: 'licensing', title: en["model.how_are_github_and_copilot_licenses_governed"], why: en["model.license_ownership_and_utilization_make_commercial_planning_credible"],
+        options: [en["model.seat_counts_and_owners_are_unknown"], en["model.seats_tracked_manually_without_utilization_reviews"], en["model.owners_and_periodic_seat_reconciliation_established"], en["model.utilization_and_allocation_reviewed_with_procurement"], en["model.forecasting_and_ongoing_optimization_tied_to_adoption"]],
+        action: en["model.reconcile_assigned_seats_active_use_plan_eligibility_and_procurement"], evidence: en["model.seat_inventory_utilization_report_purchasing_agreement"] },
     ],
   },
   {
-    id: 'security', name: 'Security & DevSecOps', short: 'DevSecOps', weight: 20,
-    description: 'Security controls that protect code, credentials, and the software supply chain.', color: '#3dd6c6',
+    id: 'security', name: en["model.security_devsecops"], short: en["ui.devsecops"], weight: 20,
+    description: en["model.security_controls_that_protect_code_credentials_and_the_software"], color: '#3dd6c6',
     questions: [
-      { id: 'secrets', title: 'How are exposed secrets prevented and remediated?', why: 'Leaked credentials can bypass otherwise strong platform controls.',
-        options: ['No scanning or response process', 'Manual checks and ad hoc credential rotation', 'Secret scanning and an owned response process', 'Push protection and rotation workflows broadly applied', 'Coverage and response times continuously monitored'], critical: true,
-        action: 'Enable supported secret scanning and push protection, then rehearse revocation and rotation.', evidence: 'Scanning coverage, push-protection settings, response runbook' },
-      { id: 'code-security', title: 'How is code analyzed for vulnerabilities?', why: 'Analysis only creates value when findings reach remediation.',
-        options: ['No systematic code analysis', 'Occasional manual or tool-based reviews', 'Automated analysis for critical repositories', 'Analysis in pull requests with owned remediation SLAs', 'Risk-based coverage and remediation performance tracked'],
-        action: 'Pilot code scanning on critical repositories and assign risk-based remediation owners.', evidence: 'Code-scanning configuration, triage workflow, SLA' },
-      { id: 'dependencies', title: 'How are vulnerable dependencies managed?', why: 'Third-party components are part of your production risk.',
-        options: ['Dependencies not inventoried or monitored', 'Manual checks during releases', 'Automated alerts and an assigned triage owner', 'Automated update PRs with tested remediation workflows', 'Supply-chain policy, provenance, and measurable SLAs'],
-        action: 'Inventory dependencies, enable alerts and update automation, and prioritize exploitable findings.', evidence: 'Dependency alerts, update configuration, remediation backlog' },
-      { id: 'pipeline-security', title: 'How are CI/CD credentials and execution protected?', why: 'Build systems often have privileged paths to production.',
-        options: ['Shared long-lived credentials and unrestricted runners', 'Some credentials scoped; runner controls inconsistent', 'Scoped permissions, protected environments, managed secrets', 'Short-lived federation and hardened runner boundaries', 'Trust boundaries and provenance continuously verified'], critical: true,
-        action: 'Reduce workflow permissions, protect deployment environments, and adopt short-lived federation where supported.', evidence: 'Workflow permissions, runner topology, environment rules' },
-      { id: 'incident', title: 'How ready is the team to respond to a code-platform incident?', why: 'A clear response plan reduces the impact of a security event.',
-        options: ['No response ownership or runbook', 'Owners identified; response is improvised', 'Documented runbooks and escalation paths', 'Regular exercises with recovery and communication plans', 'Exercises and incidents feed measured improvements'],
-        action: 'Write and exercise a platform incident runbook covering credential exposure and compromised automation.', evidence: 'Runbook, exercise notes, recovery objectives' },
+      { id: 'secrets', title: en["model.how_are_exposed_secrets_prevented_and_remediated"], why: en["model.leaked_credentials_can_bypass_otherwise_strong_platform_controls"],
+        options: [en["model.no_scanning_or_response_process"], en["model.manual_checks_and_ad_hoc_credential_rotation"], en["model.secret_scanning_and_an_owned_response_process"], en["model.push_protection_and_rotation_workflows_broadly_applied"], en["model.coverage_and_response_times_continuously_monitored"]], critical: true,
+        action: en["model.enable_supported_secret_scanning_and_push_protection_then_rehearse"], evidence: en["model.scanning_coverage_push_protection_settings_response_runbook"] },
+      { id: 'code-security', title: en["model.how_is_code_analyzed_for_vulnerabilities"], why: en["model.analysis_only_creates_value_when_findings_reach_remediation"],
+        options: [en["model.no_systematic_code_analysis"], en["model.occasional_manual_or_tool_based_reviews"], en["model.automated_analysis_for_critical_repositories"], en["model.analysis_in_pull_requests_with_owned_remediation_slas"], en["model.risk_based_coverage_and_remediation_performance_tracked"]],
+        action: en["model.pilot_code_scanning_on_critical_repositories_and_assign_risk"], evidence: en["model.code_scanning_configuration_triage_workflow_sla"] },
+      { id: 'dependencies', title: en["model.how_are_vulnerable_dependencies_managed"], why: en["model.third_party_components_are_part_of_your_production_risk"],
+        options: [en["model.dependencies_not_inventoried_or_monitored"], en["model.manual_checks_during_releases"], en["model.automated_alerts_and_an_assigned_triage_owner"], en["model.automated_update_prs_with_tested_remediation_workflows"], en["model.supply_chain_policy_provenance_and_measurable_slas"]],
+        action: en["model.inventory_dependencies_enable_alerts_and_update_automation_and_prioritize"], evidence: en["model.dependency_alerts_update_configuration_remediation_backlog"] },
+      { id: 'pipeline-security', title: en["model.how_are_ci_cd_credentials_and_execution_protected"], why: en["model.build_systems_often_have_privileged_paths_to_production"],
+        options: [en["model.shared_long_lived_credentials_and_unrestricted_runners"], en["model.some_credentials_scoped_runner_controls_inconsistent"], en["model.scoped_permissions_protected_environments_managed_secrets"], en["model.short_lived_federation_and_hardened_runner_boundaries"], en["model.trust_boundaries_and_provenance_continuously_verified"]], critical: true,
+        action: en["model.reduce_workflow_permissions_protect_deployment_environments_and_adopt_short"], evidence: en["model.workflow_permissions_runner_topology_environment_rules"] },
+      { id: 'incident', title: en["model.how_ready_is_the_team_to_respond_to_a"], why: en["model.a_clear_response_plan_reduces_the_impact_of_a"],
+        options: [en["model.no_response_ownership_or_runbook"], en["model.owners_identified_response_is_improvised"], en["model.documented_runbooks_and_escalation_paths"], en["model.regular_exercises_with_recovery_and_communication_plans"], en["model.exercises_and_incidents_feed_measured_improvements"]],
+        action: en["model.write_and_exercise_a_platform_incident_runbook_covering_credential"], evidence: en["model.runbook_exercise_notes_recovery_objectives"] },
     ],
   },
   {
-    id: 'delivery', name: 'Delivery & automation', short: 'Delivery', weight: 15,
-    description: 'Repeatable pipelines and safe, observable paths from a change to production.', color: '#a58aff',
+    id: 'delivery', name: en["model.delivery_automation"], short: en["ui.delivery"], weight: 15,
+    description: en["model.repeatable_pipelines_and_safe_observable_paths_from_a_change"], color: '#a58aff',
     questions: [
-      { id: 'ci', title: 'How consistently are builds and tests automated?', why: 'Repeatable validation is the baseline for reliable delivery.',
-        options: ['Builds and tests mostly manual', 'Automation exists for a few teams', 'Most active repositories run CI for pull requests', 'Reusable, maintained CI workflows used broadly', 'CI quality, speed, and coverage measured and improved'],
-        action: 'Create a reusable pull-request build and test workflow and pilot it with representative teams.', evidence: 'Pipeline inventory, test runs, reusable workflows' },
-      { id: 'deployment', title: 'How safe and repeatable are production deployments?', why: 'Controlled deployments reduce release risk without adding manual bottlenecks.',
-        options: ['Manual, undocumented deployments', 'Scripts exist but differ by team', 'Automated deployments with approval and rollback steps', 'Standard environments and tested rollback strategies', 'Progressive delivery with measured recovery and reliability'],
-        action: 'Document deployment environments, approvals, and rollback; automate a representative service.', evidence: 'Deployment workflow, environment gates, rollback drill' },
-      { id: 'artifacts', title: 'How are build artifacts and environments managed?', why: 'Traceable artifacts help teams reproduce and trust releases.',
-        options: ['Artifacts and environments managed ad hoc', 'Shared storage and manually tracked versions', 'Versioned artifacts and documented environment setup', 'Infrastructure-as-code and controlled artifact promotion', 'Provenance, reproducibility, and lifecycle policy enforced'],
-        action: 'Standardize versioned artifacts and reproducible environment definitions.', evidence: 'Registry, infrastructure definitions, promotion policy' },
-      { id: 'delivery-metrics', title: 'How is delivery performance understood?', why: 'Baseline metrics are needed to demonstrate modernization outcomes.',
-        options: ['No delivery baseline', 'Anecdotal feedback and manual reporting', 'Lead time, frequency, failure, and recovery baselined', 'Metrics reviewed regularly with team-level actions', 'Trends guide experiments with business outcome checks'],
-        action: 'Baseline delivery flow and reliability measures without using them to rank individuals.', evidence: 'Delivery metrics, baseline period, improvement review' },
-      { id: 'integrations', title: 'How well are platform integrations and migration dependencies understood?', why: 'Hidden dependencies can make a straightforward migration complex.',
-        options: ['Integrations and dependencies unknown', 'Some dependencies known by individual teams', 'Inventory includes boards, pipelines, packages, and identity', 'Criticality, owners, and migration tests documented', 'Dependencies validated with rehearsals and rollback plans'],
-        action: 'Map boards, pipelines, packages, identity, and external integrations before choosing a migration wave.', evidence: 'Integration map, compatibility findings, migration rehearsal' },
+      { id: 'ci', title: en["model.how_consistently_are_builds_and_tests_automated"], why: en["model.repeatable_validation_is_the_baseline_for_reliable_delivery"],
+        options: [en["model.builds_and_tests_mostly_manual"], en["model.automation_exists_for_a_few_teams"], en["model.most_active_repositories_run_ci_for_pull_requests"], en["model.reusable_maintained_ci_workflows_used_broadly"], en["model.ci_quality_speed_and_coverage_measured_and_improved"]],
+        action: en["model.create_a_reusable_pull_request_build_and_test_workflow"], evidence: en["model.pipeline_inventory_test_runs_reusable_workflows"] },
+      { id: 'deployment', title: en["model.how_safe_and_repeatable_are_production_deployments"], why: en["model.controlled_deployments_reduce_release_risk_without_adding_manual_bottlenecks"],
+        options: [en["model.manual_undocumented_deployments"], en["model.scripts_exist_but_differ_by_team"], en["model.automated_deployments_with_approval_and_rollback_steps"], en["model.standard_environments_and_tested_rollback_strategies"], en["model.progressive_delivery_with_measured_recovery_and_reliability"]],
+        action: en["model.document_deployment_environments_approvals_and_rollback_automate_a_representative"], evidence: en["model.deployment_workflow_environment_gates_rollback_drill"] },
+      { id: 'artifacts', title: en["model.how_are_build_artifacts_and_environments_managed"], why: en["model.traceable_artifacts_help_teams_reproduce_and_trust_releases"],
+        options: [en["model.artifacts_and_environments_managed_ad_hoc"], en["model.shared_storage_and_manually_tracked_versions"], en["model.versioned_artifacts_and_documented_environment_setup"], en["model.infrastructure_as_code_and_controlled_artifact_promotion"], en["model.provenance_reproducibility_and_lifecycle_policy_enforced"]],
+        action: en["model.standardize_versioned_artifacts_and_reproducible_environment_definitions"], evidence: en["model.registry_infrastructure_definitions_promotion_policy"] },
+      { id: 'delivery-metrics', title: en["model.how_is_delivery_performance_understood"], why: en["model.baseline_metrics_are_needed_to_demonstrate_modernization_outcomes"],
+        options: [en["model.no_delivery_baseline"], en["model.anecdotal_feedback_and_manual_reporting"], en["model.lead_time_frequency_failure_and_recovery_baselined"], en["model.metrics_reviewed_regularly_with_team_level_actions"], en["model.trends_guide_experiments_with_business_outcome_checks"]],
+        action: en["model.baseline_delivery_flow_and_reliability_measures_without_using_them"], evidence: en["model.delivery_metrics_baseline_period_improvement_review"] },
+      { id: 'integrations', title: en["model.how_well_are_platform_integrations_and_migration_dependencies_understood"], why: en["model.hidden_dependencies_can_make_a_straightforward_migration_complex"],
+        options: [en["model.integrations_and_dependencies_unknown"], en["model.some_dependencies_known_by_individual_teams"], en["model.inventory_includes_boards_pipelines_packages_and_identity"], en["model.criticality_owners_and_migration_tests_documented"], en["model.dependencies_validated_with_rehearsals_and_rollback_plans"]],
+        action: en["model.map_boards_pipelines_packages_identity_and_external_integrations_before"], evidence: en["model.integration_map_compatibility_findings_migration_rehearsal"] },
     ],
   },
   {
-    id: 'experience', name: 'Developer experience', short: 'Developer experience', weight: 15,
-    description: 'A productive, collaborative development workflow that teams can actually adopt.', color: '#ffb86b',
+    id: 'experience', name: en["model.developer_experience"], short: en["model.developer_experience"], weight: 15,
+    description: en["model.a_productive_collaborative_development_workflow_that_teams_can_actually"], color: '#ffb86b',
     questions: [
-      { id: 'onboarding', title: 'How predictable is developer onboarding?', why: 'Onboarding friction reveals gaps in access, environments, and documentation.',
-        options: ['Setup depends on individual help', 'Team-specific setup notes exist', 'Maintained onboarding checklist and environment guide', 'Self-service access and reproducible development setup', 'Time-to-first-change measured and systematically reduced'],
-        action: 'Create a maintained onboarding path and measure time to the first successful change.', evidence: 'Onboarding guide, setup scripts, developer feedback' },
-      { id: 'collaboration', title: 'How consistently do teams collaborate through pull requests?', why: 'Review quality depends on shared expectations, not just enabling a feature.',
-        options: ['Changes often bypass peer review', 'Reviews used inconsistently', 'Pull requests, owners, and review expectations established', 'Small changes and review turnaround actively supported', 'Review quality and flow continuously improved'],
-        action: 'Agree on code ownership, pull-request templates, review expectations, and small-change practices.', evidence: 'Pull requests, CODEOWNERS, review working agreement' },
-      { id: 'planning', title: 'How traceable is work from planning to delivery?', why: 'Teams need a coherent view across issues, boards, code, and releases.',
-        options: ['Work tracked in disconnected places', 'Team boards exist without consistent links to code', 'Issues and changes linked with clear acceptance criteria', 'Cross-team dependencies and release views maintained', 'Outcome feedback shapes prioritization and work in progress'],
-        action: 'Connect work items to changes and releases, including any retained Azure Boards workflow.', evidence: 'Project boards, linked issues and PRs, release notes' },
-      { id: 'templates', title: 'How easily can teams reuse proven engineering patterns?', why: 'Supported paved roads reduce duplication without removing team autonomy.',
-        options: ['Each team starts from scratch', 'Informal snippets shared between developers', 'Maintained repository templates and guidance', 'Supported self-service templates and inner-source reuse', 'Adoption and feedback inform a maintained platform offering'],
-        action: 'Publish supported starter repositories with tests, ownership, and contribution guidance.', evidence: 'Templates, shared components, contribution model' },
-      { id: 'feedback', title: 'How is developer friction identified and addressed?', why: 'Developer feedback is necessary to distinguish tool adoption from actual improvement.',
-        options: ['No structured developer feedback', 'Occasional informal feedback', 'Regular surveys and a visible improvement backlog', 'Feedback combined with workflow and adoption signals', 'Closed-loop improvements measured with affected teams'],
-        action: 'Establish a lightweight developer-feedback baseline and prioritize the top friction points.', evidence: 'Survey, friction backlog, completed improvements' },
+      { id: 'onboarding', title: en["model.how_predictable_is_developer_onboarding"], why: en["model.onboarding_friction_reveals_gaps_in_access_environments_and_documentation"],
+        options: [en["model.setup_depends_on_individual_help"], en["model.team_specific_setup_notes_exist"], en["model.maintained_onboarding_checklist_and_environment_guide"], en["model.self_service_access_and_reproducible_development_setup"], en["model.time_to_first_change_measured_and_systematically_reduced"]],
+        action: en["model.create_a_maintained_onboarding_path_and_measure_time_to"], evidence: en["model.onboarding_guide_setup_scripts_developer_feedback"] },
+      { id: 'collaboration', title: en["model.how_consistently_do_teams_collaborate_through_pull_requests"], why: en["model.review_quality_depends_on_shared_expectations_not_just_enabling"],
+        options: [en["model.changes_often_bypass_peer_review"], en["model.reviews_used_inconsistently"], en["model.pull_requests_owners_and_review_expectations_established"], en["model.small_changes_and_review_turnaround_actively_supported"], en["model.review_quality_and_flow_continuously_improved"]],
+        action: en["model.agree_on_code_ownership_pull_request_templates_review_expectations"], evidence: en["model.pull_requests_codeowners_review_working_agreement"] },
+      { id: 'planning', title: en["model.how_traceable_is_work_from_planning_to_delivery"], why: en["model.teams_need_a_coherent_view_across_issues_boards_code"],
+        options: [en["model.work_tracked_in_disconnected_places"], en["model.team_boards_exist_without_consistent_links_to_code"], en["model.issues_and_changes_linked_with_clear_acceptance_criteria"], en["model.cross_team_dependencies_and_release_views_maintained"], en["model.outcome_feedback_shapes_prioritization_and_work_in_progress"]],
+        action: en["model.connect_work_items_to_changes_and_releases_including_any"], evidence: en["model.project_boards_linked_issues_and_prs_release_notes"] },
+      { id: 'templates', title: en["model.how_easily_can_teams_reuse_proven_engineering_patterns"], why: en["model.supported_paved_roads_reduce_duplication_without_removing_team_autonomy"],
+        options: [en["model.each_team_starts_from_scratch"], en["model.informal_snippets_shared_between_developers"], en["model.maintained_repository_templates_and_guidance"], en["model.supported_self_service_templates_and_inner_source_reuse"], en["model.adoption_and_feedback_inform_a_maintained_platform_offering"]],
+        action: en["model.publish_supported_starter_repositories_with_tests_ownership_and_contribution"], evidence: en["model.templates_shared_components_contribution_model"] },
+      { id: 'feedback', title: en["model.how_is_developer_friction_identified_and_addressed"], why: en["model.developer_feedback_is_necessary_to_distinguish_tool_adoption_from"],
+        options: [en["model.no_structured_developer_feedback"], en["model.occasional_informal_feedback"], en["model.regular_surveys_and_a_visible_improvement_backlog"], en["model.feedback_combined_with_workflow_and_adoption_signals"], en["model.closed_loop_improvements_measured_with_affected_teams"]],
+        action: en["model.establish_a_lightweight_developer_feedback_baseline_and_prioritize_the"], evidence: en["model.survey_friction_backlog_completed_improvements"] },
     ],
   },
   {
-    id: 'copilot', name: 'Copilot & responsible AI', short: 'Copilot', weight: 20,
-    description: 'Governed AI adoption, practical enablement, and evidence of developer value.', color: '#d399ff',
+    id: 'copilot', name: en["model.copilot_responsible_ai"], short: en["ui.copilot"], weight: 20,
+    description: en["model.governed_ai_adoption_practical_enablement_and_evidence_of_developer"], color: '#d399ff',
     questions: [
-      { id: 'ai-policy', title: 'How is AI-assisted development governed?', why: 'A rollout needs approved usage boundaries and human accountability.',
-        options: ['No approved AI policy', 'Informal guidance or isolated approvals', 'Documented acceptable use, privacy, and review requirements', 'Centrally managed policies and approved tool configuration', 'Policy effectiveness reviewed with security and legal'], critical: true,
-        action: 'Agree on AI acceptable use, data handling, approved tools, and mandatory human review.', evidence: 'AI policy, security/legal approval, organization settings' },
-      { id: 'ai-rollout', title: 'How far has the Copilot rollout progressed?', why: 'A deliberate pilot builds evidence before expanding access.',
-        options: ['Not deployed', 'Small informal trial', 'Sponsored pilot with cohorts and success criteria', 'Phased rollout with license and usage governance', 'Sustained adoption with ongoing cohort improvements'],
-        action: 'Launch a sponsored Copilot pilot with named cohorts, baseline measures, and expansion criteria.', evidence: 'Pilot charter, seat assignments, rollout plan' },
-      { id: 'ai-skills', title: 'How prepared are developers to use Copilot effectively?', why: 'Value depends on task selection, context, verification, and new working habits.',
-        options: ['No enablement', 'Introductory demos only', 'Hands-on training on relevant tasks and verification', 'Role-specific learning, champions, and office hours', 'Ongoing enablement informed by usage and feedback'],
-        action: 'Run hands-on Copilot workshops using real workflows, testing, and output verification.', evidence: 'Training material, attendance, champion network' },
-      { id: 'ai-workflows', title: 'How is AI assistance integrated into engineering workflows?', why: 'Workflow adoption is more meaningful than access to a tool.',
-        options: ['No defined use cases', 'Occasional completion or chat usage', 'Documented use cases for code, tests, and explanation', 'Approved IDE and repository workflows with review gates', 'Workflow experiments evaluated for quality and usefulness'],
-        action: 'Prioritize repeatable AI use cases and retain tests, reviews, and security gates.', evidence: 'Use-case catalog, working examples, review guidance' },
-      { id: 'ai-value', title: 'How is Copilot value evaluated?', why: 'Usage alone does not demonstrate productivity, quality, or business impact.',
-        options: ['No baseline or success measures', 'Anecdotes or assigned-seat counts only', 'Usage, satisfaction, and workflow baselines collected', 'Cohorts reviewed against quality and delivery outcomes', 'Evidence guides expansion without individual surveillance'],
-        action: 'Baseline adoption, satisfaction, quality, and delivery outcomes; review pilot cohorts regularly.', evidence: 'Baseline, cohort report, adoption and quality measures' },
+      { id: 'ai-policy', title: en["model.how_is_ai_assisted_development_governed"], why: en["model.a_rollout_needs_approved_usage_boundaries_and_human_accountability"],
+        options: [en["model.no_approved_ai_policy"], en["model.informal_guidance_or_isolated_approvals"], en["model.documented_acceptable_use_privacy_and_review_requirements"], en["model.centrally_managed_policies_and_approved_tool_configuration"], en["model.policy_effectiveness_reviewed_with_security_and_legal"]], critical: true,
+        action: en["model.agree_on_ai_acceptable_use_data_handling_approved_tools"], evidence: en["model.ai_policy_security_legal_approval_organization_settings"] },
+      { id: 'ai-rollout', title: en["model.how_far_has_the_copilot_rollout_progressed"], why: en["model.a_deliberate_pilot_builds_evidence_before_expanding_access"],
+        options: [en["ui.not_deployed"], en["model.small_informal_trial"], en["model.sponsored_pilot_with_cohorts_and_success_criteria"], en["model.phased_rollout_with_license_and_usage_governance"], en["model.sustained_adoption_with_ongoing_cohort_improvements"]],
+        action: en["model.launch_a_sponsored_copilot_pilot_with_named_cohorts_baseline"], evidence: en["model.pilot_charter_seat_assignments_rollout_plan"] },
+      { id: 'ai-skills', title: en["model.how_prepared_are_developers_to_use_copilot_effectively"], why: en["model.value_depends_on_task_selection_context_verification_and_new"],
+        options: [en["model.no_enablement"], en["model.introductory_demos_only"], en["model.hands_on_training_on_relevant_tasks_and_verification"], en["model.role_specific_learning_champions_and_office_hours"], en["model.ongoing_enablement_informed_by_usage_and_feedback"]],
+        action: en["model.run_hands_on_copilot_workshops_using_real_workflows_testing"], evidence: en["model.training_material_attendance_champion_network"] },
+      { id: 'ai-workflows', title: en["model.how_is_ai_assistance_integrated_into_engineering_workflows"], why: en["model.workflow_adoption_is_more_meaningful_than_access_to_a"],
+        options: [en["model.no_defined_use_cases"], en["model.occasional_completion_or_chat_usage"], en["model.documented_use_cases_for_code_tests_and_explanation"], en["model.approved_ide_and_repository_workflows_with_review_gates"], en["model.workflow_experiments_evaluated_for_quality_and_usefulness"]],
+        action: en["model.prioritize_repeatable_ai_use_cases_and_retain_tests_reviews"], evidence: en["model.use_case_catalog_working_examples_review_guidance"] },
+      { id: 'ai-value', title: en["model.how_is_copilot_value_evaluated"], why: en["model.usage_alone_does_not_demonstrate_productivity_quality_or_business"],
+        options: [en["model.no_baseline_or_success_measures"], en["model.anecdotes_or_assigned_seat_counts_only"], en["model.usage_satisfaction_and_workflow_baselines_collected"], en["model.cohorts_reviewed_against_quality_and_delivery_outcomes"], en["model.evidence_guides_expansion_without_individual_surveillance"]],
+        action: en["model.baseline_adoption_satisfaction_quality_and_delivery_outcomes_review_pilot"], evidence: en["model.baseline_cohort_report_adoption_and_quality_measures"] },
     ],
   },
   {
-    id: 'change', name: 'Strategy & change readiness', short: 'Change readiness', weight: 10,
-    description: 'The sponsorship, capacity, and operating model to make modernization stick.', color: '#76c893',
+    id: 'change', name: en["model.strategy_change_readiness"], short: en["model.change_readiness"], weight: 10,
+    description: en["model.the_sponsorship_capacity_and_operating_model_to_make_modernization"], color: '#76c893',
     questions: [
-      { id: 'sponsor', title: 'How strong is sponsorship for modernization?', why: 'Platform change needs a decision maker and a measurable reason to act.',
-        options: ['No sponsor or shared goal', 'Interest exists but no accountable sponsor', 'Named sponsor and agreed business objectives', 'Funded program with decision cadence and owners', 'Outcomes reviewed and investment adapted'],
-        action: 'Name a sponsor and agree on measurable modernization outcomes and decision owners.', evidence: 'Sponsor, charter, agreed outcomes' },
-      { id: 'capacity', title: 'Is there capacity to implement and operate the changes?', why: 'Readiness includes people and time, not only technical compatibility.',
-        options: ['No identified capacity', 'Work expected to happen alongside existing duties', 'Named implementation and operational owners', 'Allocated capacity, skills plan, and support model', 'Capacity and support effectiveness reviewed continuously'],
-        action: 'Allocate implementation capacity and define the platform support and operating model.', evidence: 'Team allocation, responsibilities, support model' },
-      { id: 'constraints', title: 'How well are regulatory, residency, and hosting constraints understood?', why: 'Some requirements determine which target platforms are viable.',
-        options: ['Constraints unknown', 'Assumptions exist but are not validated', 'Documented requirements reviewed by relevant stakeholders', 'Requirements mapped to target architecture and controls', 'Controls and exceptions validated with recurring evidence'],
-        action: 'Validate regulatory, residency, network, and hosting constraints before committing to a target.', evidence: 'Requirements register, architecture review, approvals' },
-      { id: 'adoption', title: 'How will teams be supported through the change?', why: 'Migration completion is not the same as adoption.',
-        options: ['No communication or adoption plan', 'Launch communication only', 'Team engagement, training, and support plan', 'Champions and phased adoption with feedback channels', 'Adoption barriers measured and addressed continuously'],
-        action: 'Create a stakeholder communication plan, champion network, and feedback-driven rollout.', evidence: 'Communication plan, training schedule, support channels' },
-      { id: 'roadmap', title: 'How actionable is the modernization roadmap?', why: 'An achievable sequence connects dependencies, value, and readiness.',
-        options: ['No roadmap', 'Unprioritized list of ideas', 'Prioritized milestones with owners and dependencies', 'Pilot, migration waves, rollback, and success criteria agreed', 'Roadmap evolves from measured outcomes and risks'],
-        action: 'Agree on a 30/60/90-day plan with a pilot, owners, dependencies, and exit criteria.', evidence: 'Roadmap, pilot plan, decision log' },
+      { id: 'sponsor', title: en["model.how_strong_is_sponsorship_for_modernization"], why: en["model.platform_change_needs_a_decision_maker_and_a_measurable"],
+        options: [en["model.no_sponsor_or_shared_goal"], en["model.interest_exists_but_no_accountable_sponsor"], en["model.named_sponsor_and_agreed_business_objectives"], en["model.funded_program_with_decision_cadence_and_owners"], en["model.outcomes_reviewed_and_investment_adapted"]],
+        action: en["model.name_a_sponsor_and_agree_on_measurable_modernization_outcomes"], evidence: en["model.sponsor_charter_agreed_outcomes"] },
+      { id: 'capacity', title: en["model.is_there_capacity_to_implement_and_operate_the_changes"], why: en["model.readiness_includes_people_and_time_not_only_technical_compatibility"],
+        options: [en["model.no_identified_capacity"], en["model.work_expected_to_happen_alongside_existing_duties"], en["model.named_implementation_and_operational_owners"], en["model.allocated_capacity_skills_plan_and_support_model"], en["model.capacity_and_support_effectiveness_reviewed_continuously"]],
+        action: en["model.allocate_implementation_capacity_and_define_the_platform_support_and"], evidence: en["model.team_allocation_responsibilities_support_model"] },
+      { id: 'constraints', title: en["model.how_well_are_regulatory_residency_and_hosting_constraints_understood"], why: en["model.some_requirements_determine_which_target_platforms_are_viable"],
+        options: [en["model.constraints_unknown"], en["model.assumptions_exist_but_are_not_validated"], en["model.documented_requirements_reviewed_by_relevant_stakeholders"], en["model.requirements_mapped_to_target_architecture_and_controls"], en["model.controls_and_exceptions_validated_with_recurring_evidence"]],
+        action: en["model.validate_regulatory_residency_network_and_hosting_constraints_before_committing"], evidence: en["model.requirements_register_architecture_review_approvals"] },
+      { id: 'adoption', title: en["model.how_will_teams_be_supported_through_the_change"], why: en["model.migration_completion_is_not_the_same_as_adoption"],
+        options: [en["model.no_communication_or_adoption_plan"], en["model.launch_communication_only"], en["model.team_engagement_training_and_support_plan"], en["model.champions_and_phased_adoption_with_feedback_channels"], en["model.adoption_barriers_measured_and_addressed_continuously"]],
+        action: en["model.create_a_stakeholder_communication_plan_champion_network_and_feedback"], evidence: en["model.communication_plan_training_schedule_support_channels"] },
+      { id: 'roadmap', title: en["model.how_actionable_is_the_modernization_roadmap"], why: en["model.an_achievable_sequence_connects_dependencies_value_and_readiness"],
+        options: [en["model.no_roadmap"], en["model.unprioritized_list_of_ideas"], en["model.prioritized_milestones_with_owners_and_dependencies"], en["model.pilot_migration_waves_rollback_and_success_criteria_agreed"], en["model.roadmap_evolves_from_measured_outcomes_and_risks"]],
+        action: en["model.agree_on_a_30_60_90_day_plan_with"], evidence: en["model.roadmap_pilot_plan_decision_log"] },
     ],
   },
 ]
-
 export const allQuestions = pillars.flatMap(p => p.questions)
-export const maturityLevels = ['Initial', 'Developing', 'Defined', 'Managed', 'Optimizing'] as const
-export const ratingNames = ['Not established', 'Ad hoc', 'Defined', 'Managed', 'Optimizing']
-
+export const maturityLevels = [en["ui.initial"], en["ui.developing"], en["ui.defined"], en["ui.managed"], en["ui.optimizing"]] as const
+export const ratingNames = [en["model.not_established"], en["model.ad_hoc"], en["ui.defined"], en["ui.managed"], en["ui.optimizing"]]
 export function isAnswered(a: Assessment, id: string) {
   const answer = a.answers[id]
   return answer !== undefined && answer.value !== null
 }
-
 export function newAssessment(): Assessment {
   return {
     id: crypto.randomUUID(), customer: '', facilitator: '', date: new Date().toISOString().slice(0, 10),
@@ -186,17 +191,16 @@ export function newAssessment(): Assessment {
     answers: {}, sample: false, updatedAt: new Date().toISOString(),
   }
 }
-
 export function exampleAssessment(): Assessment {
   const assessment = newAssessment()
   const ratings: Rating[] = [3, 3, 2, 2, 2, 2, 2, 3, 1, 2, 3, 2, 2, 2, 2, 3, 3, 2, 2, 2, 2, 2, 1, 2, 1, 3, 2, 3, 2, 2]
   return {
-    ...assessment, customer: 'Northstar Engineering', facilitator: 'Sample facilitator', platform: 'mixed',
+    ...assessment, customer: en["model.northstar_engineering"], facilitator: en["model.sample_facilitator"], platform: 'mixed',
     hosting: 'cloud', copilotPlan: 'business', developers: 240, seats: 80, sample: true,
-    dependencies: 'Azure Boards retained for portfolio planning. Eight production pipelines require migration rehearsal.',
-    constraints: 'Security approval required before expanding AI use. Identity remains managed centrally.',
+    dependencies: en["model.azure_boards_retained_for_portfolio_planning_eight_production_pipelines"],
+    constraints: en["model.security_approval_required_before_expanding_ai_use_identity_remains"],
     answers: Object.fromEntries(allQuestions.map((q, i) => [q.id, {
-      value: ratings[i], evidence: 'Illustrative response only. Replace with evidence gathered during a customer session.',
-    }])),
+        value: ratings[i], evidence: en["model.illustrative_response_only_replace_with_evidence_gathered_during_a"],
+      }])),
   }
 }

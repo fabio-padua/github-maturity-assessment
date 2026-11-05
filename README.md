@@ -100,7 +100,22 @@ These are scenarios, **not quotes, guaranteed savings, or ROI**. They exclude im
 - In local mode, editing pauses if another tab changes storage, preventing silent cross-tab overwrites.
 - Maximum 200 assessments and 5 MB per imported file in both modes. Actual browser storage limits may be lower in local mode.
 - This first version is intended for facilitated sessions, not a hosted multi-tenant customer portal.
-- Interface and questionnaire are English. Portuguese localization and server-backed customer collaboration are future product decisions.
+- Interface, questionnaire, recommendations, methodology, errors, and reports are available in English, Brazilian Portuguese, and Spanish. Server-backed customer collaboration remains outside scope.
+
+## Languages and translation maintenance
+
+Open the **user preferences menu** beside the avatar in the top bar and select **English**, **Português (Brasil)**, or **Español**. Language changes apply immediately without resetting answers, notes, or scores. Markdown exports and printed/PDF reports use the current language; JSON exports preserve the language-independent assessment schema and the customer's original input.
+
+The locale is kept in the URL (`?lang=en`, `?lang=pt-BR`, `?lang=es`), not browser storage. Reloading preserves the language choice while **demo answers still disappear**. English is the default; dates and currency presentation use `Intl`, with prices remaining in USD (no currency conversion).
+
+- `src/i18n/en.ts` is the canonical copy catalog and defines the stable `MessageKey` union. Change wording there without renaming its key.
+- `src/i18n/pt-BR.ts` and `src/i18n/es.ts` must implement every key with `satisfies Record<MessageKey, string>`; missing or misspelled keys fail the build.
+- Use `useI18n().t(key, values)` for React copy and `translator(locale)` outside React. Keep whole messages with `{namedPlaceholders}` where ordering or counts matter; never concatenate translated fragments for new copy. Supply separate singular/plural messages.
+- Format entered prices, hours, and hourly rates with `formatAssumption` (or `useI18n().assumption`) to preserve every supplied fractional digit, including trailing zeros. Use `formatNumber`/`formatMoney` with explicit rounding only for calculated totals; do not convert decimal assumption strings to `Number` for display.
+- Question IDs, option indices, platform values, scoring rules, and JSON field names must never be translated. The model references canonical catalog copy; the display adapter localizes that copy without mutating customer records.
+- Never send customer names, notes, or free text to a translation service. Only built-in synthetic sample text is localized; customer-authored content stays untouched.
+- When adding a language, extend `locales`, `languageNames`, `catalogs`, and `resolveLocale` in `src/i18n/core.ts`, add its complete catalog, and extend the browser scenarios.
+- `npm test` checks catalog parity, placeholders/whitespace, all question/answer/roadmap copy, and localized exports. `npm run test:e2e` and `npm run test:demo` exercise language switching and preservation on desktop/mobile.
 
 ## Project layout
 
