@@ -33,17 +33,19 @@ The federated credential uses:
 
 ```text
 Issuer:   https://token.actions.githubusercontent.com
-Subject:  repo:<OWNER>/<REPOSITORY>:ref:refs/heads/main
+Subject:  <GITHUB_SUB_CLAIM_PREFIX>:ref:refs/heads/main
 Audience: api://AzureADTokenExchange
 ```
 
-Replace placeholders locally, not in committed documentation. Verify the subject matches the intended repository exactly.
+The setup script reads `actions/oidc/customization/sub` for the intended repository and derives the subject from its `sub_claim_prefix`. Repositories using immutable subjects include owner and repository IDs in that prefix; a name-only subject will not match. Keep immutable subjects enabled. Both default immutable and default legacy profiles are supported, but missing, inconsistent or custom profiles fail explicitly rather than guessing a trust relationship.
+
+Replace placeholders locally, not in committed documentation. Verify the subject matches the intended repository's actual profile exactly. Issuer and audience remain fixed; only the main branch is trusted. The Bicep subject is a required parameter with no legacy-format fallback.
 
 The current private-repository plan does not provide private branch protection or deployment-environment approvals. The workflow therefore uses a strict main-ref federation and repository Secrets. It gates deployment on CI but does not enforce PRs or independent review. A suitably licensed repository can add required reviews and environment approvals separately.
 
 ## Optional administrator setup script
 
-For reconciliation, review `scripts/setup-azure-auth-for-pipeline.ps1` and its Bicep templates before running them. Use the actual target values only in your local session. The operator requires permission to create the identity resource group, assign the scoped role, and administer repository Secrets.
+For reconciliation, review `scripts/setup-azure-auth-for-pipeline.ps1` and its Bicep templates before running them. Azure CLI, `gh` and Node.js 24 or newer are required. Use the actual target values only in your local session. The operator requires permission to create the identity resource group, assign the scoped role, read the repository's OIDC profile, and administer repository Secrets.
 
 Run with `-WhatIf` first. The script previews the identity deployment and prompts before applying Azure permissions or configuring Secrets. It is not executed by CI or CD. Running it is unnecessary when the intended identity already exists and an administrator enters the Secrets manually.
 

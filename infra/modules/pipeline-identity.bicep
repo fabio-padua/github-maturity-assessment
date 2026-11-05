@@ -1,6 +1,7 @@
 param location string
 param identityName string
 param repository string
+param federatedSubject string
 
 resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
   name: identityName
@@ -11,13 +12,11 @@ resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' 
   }
 }
 
-resource federation 'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials@2024-11-30' = {
-  parent: identity
+module federation './github-federation.bicep' = {
   name: 'github-main'
-  properties: {
-    issuer: 'https://token.actions.githubusercontent.com'
-    subject: 'repo:${repository}:ref:refs/heads/main'
-    audiences: ['api://AzureADTokenExchange']
+  params: {
+    identityName: identity.name
+    federatedSubject: federatedSubject
   }
 }
 

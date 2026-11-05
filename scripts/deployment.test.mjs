@@ -4,7 +4,8 @@ import { readFileSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { deploymentCandidate, isCurrentCommit, successfulMainRun, assertPublicDemoIngress, deploymentParameters, readyEndpoint, verifyBuild, verifyEndpoint } from './deployment.mjs'
+import { fileURLToPath } from 'node:url'
+import { deploymentCandidate, isCurrentCommit, successfulMainRun, assertPublicDemoIngress, deploymentParameters, readyEndpoint, verifyBuild, verifyEndpoint, githubFederationSubject } from './deployment.mjs'
 
 const sha = 'a'.repeat(40)
 const newer = 'b'.repeat(40)
@@ -14,6 +15,48 @@ const run = {
   head_branch: 'main', head_sha: sha, head_repository: { full_name: repository },
 }
 const context = { eventName: 'workflow_run', event: { workflow_run: run }, repository, ref: 'refs/heads/main', sha }
+
+test('federation uses the exact immutable-ID prefix returned by GitHub and trusts main only', () => {
+  const profile = { use_default: true, use_immutable_subject: true, sub_claim_prefix: 'repo:example@100/assessment@200' }
+  assert.equal(githubFederationSubject(profile), 'repo:example@100/assessment@200:ref:refs/heads/main')
+  const result = spawnSync(process.execPath, [fileURLToPath(new URL('./deployment.mjs', import.meta.url)), 'federation-subject'], {
+    input: JSON.stringify(profile), encoding: 'utf8',
+  })
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(result.stdout.trim(), githubFederationSubject(profile))
+})
+
+test('legacy subject format is used only when GitHub explicitly returns a legacy profile', () => {
+  assert.equal(githubFederationSubject({
+    use_default: true, use_immutable_subject: false, sub_claim_prefix: 'repo:example/assessment',
+  }), 'repo:example/assessment:ref:refs/heads/main')
+})
+
+test('federation rejects missing, custom or inconsistent subject profiles instead of guessing', () => {
+  for (const profile of [
+    undefined, {}, { use_default: false },
+    { use_default: true, use_immutable_subject: true, sub_claim_prefix: 'repo:example/assessment' },
+    { use_default: true, use_immutable_subject: false, sub_claim_prefix: 'repo:example@100/assessment@200' },
+    { use_default: true, use_immutable_subject: true, sub_claim_prefix: 'repo:example@100/*' },
+    { use_default: true, use_immutable_subject: true, sub_claim_prefix: 'repo:example@100/assessment@200:ref:refs/heads/other' },
+  ]) assert.throws(() => githubFederationSubject(profile), /GitHub/)
+})
+
+test('setup and Bicep forward the discovered subject without reconstructing a legacy subject', () => {
+  const setup = readFileSync(new URL('./setup-azure-auth-for-pipeline.ps1', import.meta.url), 'utf8')
+  const root = readFileSync(new URL('../infra/pipeline-identity.bicep', import.meta.url), 'utf8')
+  const identity = readFileSync(new URL('../infra/modules/pipeline-identity.bicep', import.meta.url), 'utf8')
+  const federation = readFileSync(new URL('../infra/modules/github-federation.bicep', import.meta.url), 'utf8')
+  assert.match(setup, /repos\/\$Repository\/actions\/oidc\/customization\/sub/)
+  assert.match(setup, /\$oidcProfile \| node .* federation-subject/)
+  assert.match(setup, /"federatedSubject=\$federatedSubject"/)
+  assert.match(root, /param federatedSubject string/)
+  assert.match(root, /federatedSubject: federatedSubject/)
+  assert.match(identity, /federatedSubject: federatedSubject/)
+  assert.match(federation, /subject: federatedSubject/)
+  assert.match(federation, /userAssignedIdentities@[^']+' existing/)
+  assert.doesNotMatch(federation, /roleAssignments|subject: 'repo:/)
+})
 
 test('only successful push CI on this repository main is eligible', () => {
   assert.deepEqual(deploymentCandidate(context), { eligible: true, sha })

@@ -28,6 +28,11 @@ if ($Repository -notmatch '^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$') { throw 'Expected
 $account = Invoke-Checked az @('account', 'show', '--subscription', $SubscriptionId, '-o', 'json') | ConvertFrom-Json
 $repo = Invoke-Checked gh @('repo', 'view', $Repository, '--json', 'viewerPermission') | ConvertFrom-Json
 if ($repo.viewerPermission -ne 'ADMIN') { throw 'Repository administrator permission is required to set Actions secrets.' }
+$oidcProfile = Invoke-Checked gh @('api', "repos/$Repository/actions/oidc/customization/sub")
+$federatedSubject = $oidcProfile | node (Join-Path $PSScriptRoot 'deployment.mjs') federation-subject
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($federatedSubject)) {
+  throw 'Could not derive the exact main-branch subject from the GitHub OIDC profile.'
+}
 $null = Invoke-Checked az @('group', 'show', '-n', $ApplicationResourceGroup, '--subscription', $SubscriptionId, '-o', 'none')
 $application = Invoke-Checked az @('resource', 'show', '--resource-group', $ApplicationResourceGroup,
   '--name', $ContainerApp, '--resource-type', 'Microsoft.App/containerApps',
@@ -45,11 +50,12 @@ if ($registryResource.roleAssignmentMode -ne 'LegacyRegistryPermissions') {
 Write-Host "Subscription: $($account.name) ($SubscriptionId)"
 Write-Host "Application scope: $ApplicationResourceGroup; Container App: $ContainerApp; registry: $Registry"
 Write-Host "Identity scope: $IdentityResourceGroup; identity: $IdentityName; region: $Location"
-Write-Host "OIDC subject: repo:${Repository}:ref:refs/heads/main"
+Write-Host 'OIDC subject: derived from the current GitHub repository profile, restricted to main.'
 Write-Host 'The identity receives Contributor only on the application resource group, not the subscription or its own identity group.'
 $template = Join-Path $PSScriptRoot '..\infra\pipeline-identity.bicep'
 $parameters = @('--parameters', "identityResourceGroupName=$IdentityResourceGroup", "identityName=$IdentityName",
-  "applicationResourceGroupName=$ApplicationResourceGroup", "repository=$Repository", "location=$Location")
+  "applicationResourceGroupName=$ApplicationResourceGroup", "repository=$Repository", "location=$Location",
+  "federatedSubject=$federatedSubject")
 Invoke-Checked az (@('deployment', 'sub', 'what-if', '--subscription', $SubscriptionId,
   '--location', $Location, '--template-file', $template) + $parameters) | Out-Host
 if (-not $PSCmdlet.ShouldProcess($Repository, 'Create Azure deployment identity, grant scoped access and configure Actions secrets')) {

@@ -7,6 +7,20 @@ export function assertSha(value) {
   return value
 }
 
+export function githubFederationSubject(profile) {
+  if (profile?.use_default !== true || typeof profile.use_immutable_subject !== 'boolean') {
+    throw new Error('Unsupported or custom GitHub OIDC subject profile; review the trust configuration explicitly.')
+  }
+  const name = '[a-zA-Z0-9_.-]+'
+  const prefixPattern = profile.use_immutable_subject
+    ? new RegExp(`^repo:${name}@[1-9][0-9]*/${name}@[1-9][0-9]*$`)
+    : new RegExp(`^repo:${name}/${name}$`)
+  if (typeof profile.sub_claim_prefix !== 'string' || !prefixPattern.test(profile.sub_claim_prefix)) {
+    throw new Error('GitHub did not return a valid subject prefix matching its configured OIDC mode.')
+  }
+  return `${profile.sub_claim_prefix}:ref:refs/heads/main`
+}
+
 export function deploymentCandidate({ eventName, event, repository, ref, sha }) {
   if (eventName === 'workflow_run') {
     const run = event.workflow_run
@@ -168,7 +182,9 @@ async function health(url, sha) {
 }
 
 async function main(command) {
-  if (command === 'gate') {
+  if (command === 'federation-subject') {
+    console.log(githubFederationSubject(JSON.parse(readFileSync(0, 'utf8'))))
+  } else if (command === 'gate') {
     const event = JSON.parse(readFileSync(required('GITHUB_EVENT_PATH'), 'utf8'))
     const candidate = deploymentCandidate({
       eventName: required('GITHUB_EVENT_NAME'), event, repository: required('GITHUB_REPOSITORY'),

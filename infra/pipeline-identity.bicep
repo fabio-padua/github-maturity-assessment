@@ -5,6 +5,9 @@ param identityResourceGroupName string
 param identityName string
 param applicationResourceGroupName string
 param repository string
+@description('Exact main-branch subject derived from the repository GitHub OIDC profile.')
+@minLength(1)
+param federatedSubject string
 
 resource identityGroup 'Microsoft.Resources/resourceGroups@2025-04-01' = {
   name: identityResourceGroupName
@@ -26,6 +29,7 @@ module identity './modules/pipeline-identity.bicep' = {
     location: location
     identityName: identityName
     repository: repository
+    federatedSubject: federatedSubject
   }
 }
 
