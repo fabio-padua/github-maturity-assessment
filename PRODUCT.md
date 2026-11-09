@@ -22,11 +22,13 @@ The confirmed first version is a local-first web application for consultant-led 
 
 Assess governance, DevSecOps, delivery, developer experience, Copilot, and organizational readiness. Explain score calculations, distinguish missing evidence from low maturity, and provide recommendations and a 30/60/90-day roadmap. The reference proposes Optimize + Copilot, Hybrid, Migrate, and Secure DevOps paths.
 
-No hosted customer accounts, backend, or automatic GitHub data collection in the first version. Answers stay in the browser unless explicitly exported. Browser storage is not a secure enterprise customer-record system. Pricing and productivity figures must be customer-provided assumptions, never invented current prices or guaranteed savings.
+No hosted customer accounts, backend, or automatic GitHub data collection in the first version. Answers stay in the browser unless explicitly exported. Browser storage is not a secure enterprise customer-record system.
 
 The user subsequently requested a public Azure demonstration in the MCAPS subscription, preferring Container Apps or App Service, with no assessment persistence. The hosted demo uses browser memory only and clears on refresh; the original local consultant mode remains available. East US 2 and public access with fictional/session-only data were confirmed.
 
 The full assessment supports English, Brazilian Portuguese, and Spanish through the user preferences menu. Language applies to UI, question content, generated recommendations, and report exports, without translating customer-authored input or changing the scoring/schema. Locale selection lives in the URL so demo assessments remain memory-only.
+
+Customer details require an explicit development-platform selection, including GitLab and Bitbucket. Other requires the customer's platform name. The current plan describes GitHub Business or GitHub Enterprise, not Copilot. Integrations/dependencies and restrictions are no longer profile fields. Business-case inputs, seat counts, financial calculations and business-case report sections are removed. Schema v2 imports legacy v1 work without guessing a GitHub plan from a Copilot plan; ratings/evidence remain unchanged and removed fields are discarded.
 
 ## Brand Commitments
 

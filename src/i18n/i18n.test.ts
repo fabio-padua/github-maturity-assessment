@@ -4,9 +4,9 @@ import appSource from '../App.tsx?raw'
 import menuSource from '../UserMenu.tsx?raw'
 import { en } from './en'
 import type { MessageKey } from './en'
-import { AssessmentError, catalogs, contentTranslator, formatDate, formatMessage, formatMoney, formatNumber, formatAssumption, locales, message, resolveLocale, translator } from './core'
+import { AssessmentError, catalogs, contentTranslator, formatDate, formatMessage, formatNumber, locales, message, resolveLocale, translator, platformName, planName } from './core'
 import { allQuestions, exampleAssessment, maturityLevels, newAssessment, pillars, ratingNames } from '../model'
-import { assess, businessCase, level, pathDescriptions, roadmap } from '../scoring'
+import { assess, level, pathDescriptions, roadmap } from '../scoring'
 import { fileStem, reportMarkdown } from '../report'
 import { parseSnapshot } from '../storage'
 
@@ -68,11 +68,9 @@ describe('translation contract', () => {
       const a = exampleAssessment()
       a.customer = 'Cliente São Paulo / Bogotá'
       a.facilitator = 'María João'
-      a.dependencies = 'Customer-authored text stays unchanged.'
+      a.platform = 'other'
+      a.otherPlatform = 'Customer-authored platform stays unchanged.'
       a.answers.identity.evidence = 'Confirmação do cliente — mantener sin traducir.'
-      a.seatCost = '12.5'
-      a.hourlyRate = '50'
-      a.hoursSaved = '1.5'
       const before = structuredClone(a)
       const report = reportMarkdown(a, locale)
       const t = translator(locale)
@@ -80,7 +78,8 @@ describe('translation contract', () => {
       expect(report).toContain(t('report.register'))
       expect(report).toContain(t('report.limitations'))
       expect(report).toContain(contentTranslator(locale)(allQuestions[0].title))
-      expect(report).toContain(a.dependencies)
+      expect(report).toContain(a.otherPlatform)
+      expect(report).toContain('GitHub Enterprise')
       expect(report).toContain(a.answers.identity.evidence)
       expect(report).toContain(a.customer)
       expect(report).toContain(a.facilitator)
@@ -88,30 +87,16 @@ describe('translation contract', () => {
       expect(report).not.toMatch(/\{\w+\}/)
       expect(a).toEqual(before)
     })
-    it(`${locale} preserves fractional assumption precision separately from rounded totals`, () => {
-      const separator = locale === 'en' ? '.' : ','
-      expect(formatAssumption('0.004', locale)).toBe(`0${separator}004`)
-      expect(formatAssumption('50.0000', locale)).toBe(`50${separator}0000`)
-      expect(formatAssumption('12.3456789', locale)).toBe(`12${separator}3456789`)
-      expect(formatAssumption('0.0000000000000000000000000001', locale)).toBe(`0${separator}0000000000000000000000000001`)
-      expect(formatAssumption('1.234567890123456789012345678', locale)).toBe(`1${separator}234567890123456789012345678`)
-      expect(formatAssumption('0', locale)).toBe('0')
-      expect(formatAssumption('1234567.8900', locale)).toBe(locale === 'en' ? '1,234,567.8900' : '1.234.567,8900')
-      const a = newAssessment()
-      Object.assign(a, { seats: 1000, seatCost: '0.00400', hoursSaved: '0.004', hourlyRate: '50.0000' })
-      const before = structuredClone(a)
-      expect(businessCase(a)).toEqual({ monthly: 4, annual: 48, gross: 9200 })
-      const report = reportMarkdown(a, locale)
-      const t = translator(locale)
-      expect(report).toContain(t('report.annual', { price: `0${separator}00400`, annual: `48${separator}00` }))
-      expect(report).toContain(t('report.capacity', {
-        gross: locale === 'en' ? '9,200.00' : locale === 'pt-BR' ? '9.200,00' : '9200,00',
-        hours: `0${separator}004`, rate: `50${separator}0000`, seats: 1000,
-      }))
-      expect(a).toEqual(before)
+    it(`${locale} labels the selected development platform and GitHub plan`, () => {
+      expect(platformName('gitlab', locale)).toBe('GitLab')
+      expect(platformName('bitbucket', locale)).toBe('Bitbucket')
+      expect(platformName('other', locale, 'Our SCM')).toBe('Our SCM')
+      expect(platformName('', locale)).toBe(translator(locale)('profile.select_platform'))
+      expect(planName('business', locale)).toBe('GitHub Business')
+      expect(planName('enterprise', locale)).toBe('GitHub Enterprise')
     })
   }
-  it('handles locale tags, interpolation, numbers, dates and fixed USD currency', () => {
+  it('handles locale tags, interpolation, numbers and dates', () => {
     expect(resolveLocale('pt-br')).toBe('pt-BR')
     expect(resolveLocale('es-MX')).toBe('es')
     expect(resolveLocale('unknown')).toBe('en')
@@ -119,13 +104,9 @@ describe('translation contract', () => {
     expect(translator('pt-BR')('counts.answers', { count: 1, total: 30 })).toContain('1/30')
     expect(() => translator('en')('counts.answers')).toThrow('Missing interpolation')
     expect(formatNumber(1234.5, 'pt-BR', 2)).toBe('1.234,50')
-    expect(formatMoney(2400, 'pt-BR')).toContain('2.400')
     expect(formatDate('2026-11-05', 'en')).toBe('Nov 5, 2026')
     expect(formatDate('2026-11-05', 'pt-BR')).toContain('2026')
     expect(fileStem('São Paulo / Bogotá')).toBe('sao-paulo-bogota')
-    for (const value of ['', '-1', '1e-3', '1,25', 'Infinity', 'not a number']) {
-      expect(() => formatAssumption(value, 'en')).toThrow(RangeError)
-    }
   })
   it('can retranslate existing errors after switching languages', () => {
     const error = new AssessmentError('error.answer', { id: 'identity' })

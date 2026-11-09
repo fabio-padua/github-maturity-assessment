@@ -41,10 +41,10 @@ For a production-build preview, run `npm run preview -- --host 127.0.0.1`. Vite 
 
 ## Customer workflow
 
-1. Capture the customer, facilitator, platform, hosting target, Copilot plan, dependencies, and constraints.
+1. Capture the customer, facilitator, date, developer count, required development platform, hosting target, and current GitHub plan. Platform options include GitHub, Azure DevOps, GitLab, Bitbucket, a mixed GitHub/Azure DevOps estate, and Other. Selecting Other requires a non-blank platform name before continuing. The plan options are GitHub Business and GitHub Enterprise, with explicit no-plan/not-confirmed states.
 2. Answer 30 behavior-specific questions across six dimensions. Record evidence or notes; unknown answers remain unanswered. Not-applicable responses require a rationale and cannot exclude critical controls.
 3. Review the dashboard, critical-control gaps, and recommended first workstream: **Optimize + Copilot**, **Hybrid**, **Migrate**, or **Secure DevOps**.
-4. Review the report: current and proposed architecture, decision matrix, findings, 30/60/90-day roadmap, pilot plan, business-case scenario, and complete response/evidence register.
+4. Review the report: current and proposed architecture, decision matrix, findings, 30/60/90-day roadmap, pilot plan, and complete response/evidence register.
 5. Export JSON backups and Markdown reports, or print the report / save it as PDF using the browser.
 
 Multiple assessments are isolated by identifier. JSON imports are validated and create **new copies**, never silently replacing existing customers. Deletion requires explicit confirmation. In local consultant mode, corrupt storage is preserved for recovery rather than overwritten.
@@ -80,14 +80,13 @@ Levels use unrounded scores: Initial `[0,20)`, Developing `[20,40)`, Defined `[4
 
 These are transparent advisory heuristics, not an automated architecture approval. Validate regulatory requirements, integration compatibility, hosting and feature eligibility, contracts, implementation capacity, and stakeholder priorities before committing to a target.
 
-### Licensing and business case
+### Simplified customer details and compatibility
 
-Optional inputs use customer-provided USD amounts; no current product price is hardcoded.
+The customer-details page no longer collects integrations/dependencies, restrictions, proposed seats, unit prices, hours saved, or hourly rates. The business-case box, financial calculations, and associated report sections are removed entirely. The existing 30 maturity questions and scoring rules are unchanged, including questions about integrations, governance, and organizational constraints.
 
-- Annual license-only scenario: `proposed seats × monthly seat price × 12`.
-- Illustrative gross capacity value: `seats × assumed hours saved per week × loaded hourly rate × 46 working weeks`.
+New JSON exports use **schema version 2**, with `githubPlan` and `otherPlatform`. Version 1 exports and existing local browser data are migrated when opened. Customers, dates, platform selections, ratings, and evidence are retained. The old Copilot subscription **is not inferred to be a GitHub subscription**: migrated records show the GitHub plan as not yet confirmed. Existing Other records need a platform name before continuing.
 
-These are scenarios, **not quotes, guaranteed savings, or ROI**. They exclude implementation, support, taxes, and existing licensing overlap. Unspecified inputs produce no estimate. Refer to [current Copilot plans](https://github.com/features/copilot/plans) and confirm commercial terms with procurement.
+Removed fields are deliberately discarded during migration and are not included in new exports or reports. Keep an original exported file if those historical fields are needed elsewhere. In-memory local drafts can still be exported/imported with blank required details; the UI requires those details before entering questions or displaying results. The original browser storage key is retained so users' saved assessments are discovered; it may contain a version 2 snapshot after editing.
 
 ## Privacy and limitations
 
@@ -106,12 +105,11 @@ These are scenarios, **not quotes, guaranteed savings, or ROI**. They exclude im
 
 Open the **user preferences menu** beside the avatar in the top bar and select **English**, **Português (Brasil)**, or **Español**. Language changes apply immediately without resetting answers, notes, or scores. Markdown exports and printed/PDF reports use the current language; JSON exports preserve the language-independent assessment schema and the customer's original input.
 
-The locale is kept in the URL (`?lang=en`, `?lang=pt-BR`, `?lang=es`), not browser storage. Reloading preserves the language choice while **demo answers still disappear**. English is the default; dates and currency presentation use `Intl`, with prices remaining in USD (no currency conversion).
+The locale is kept in the URL (`?lang=en`, `?lang=pt-BR`, `?lang=es`), not browser storage. Reloading preserves the language choice while **demo answers still disappear**. English is the default; dates and numeric report presentation use `Intl`.
 
 - `src/i18n/en.ts` is the canonical copy catalog and defines the stable `MessageKey` union. Change wording there without renaming its key.
 - `src/i18n/pt-BR.ts` and `src/i18n/es.ts` must implement every key with `satisfies Record<MessageKey, string>`; missing or misspelled keys fail the build.
 - Use `useI18n().t(key, values)` for React copy and `translator(locale)` outside React. Keep whole messages with `{namedPlaceholders}` where ordering or counts matter; never concatenate translated fragments for new copy. Supply separate singular/plural messages.
-- Format entered prices, hours, and hourly rates with `formatAssumption` (or `useI18n().assumption`) to preserve every supplied fractional digit, including trailing zeros. Use `formatNumber`/`formatMoney` with explicit rounding only for calculated totals; do not convert decimal assumption strings to `Number` for display.
 - Question IDs, option indices, platform values, scoring rules, and JSON field names must never be translated. The model references canonical catalog copy; the display adapter localizes that copy without mutating customer records.
 - Never send customer names, notes, or free text to a translation service. Only built-in synthetic sample text is localized; customer-authored content stays untouched.
 - When adding a language, extend `locales`, `languageNames`, `catalogs`, and `resolveLocale` in `src/i18n/core.ts`, add its complete catalog, and extend the browser scenarios.

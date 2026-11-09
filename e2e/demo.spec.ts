@@ -16,6 +16,7 @@ test('public demo never accesses browser storage and discards answers on refresh
   await page.evaluate(() => window.dispatchEvent(new StorageEvent('storage', { key: 'github-maturity-assessment:v1' })))
   await page.getByRole('button', { name: 'Start an assessment', exact: true }).click()
   await page.getByLabel('Customer / organization *').fill('Ephemeral Demo Customer')
+  await page.getByLabel('Current development platform').selectOption('github')
   await page.getByRole('button', { name: 'Continue to questions' }).click()
   await page.getByRole('radio').nth(3).check()
   await page.getByLabel('Evidence & session notes').fill('This note must not survive reload.')

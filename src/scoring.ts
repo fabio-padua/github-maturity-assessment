@@ -71,12 +71,6 @@ export function assess(a: Assessment) {
     readinessScore, path, rationale,
   }
 }
-export function businessCase(a: Assessment) {
-  const monthly = a.seatCost !== '' ? Number(a.seatCost) * a.seats : null
-  const gross = a.hoursSaved !== '' && a.hourlyRate !== ''
-    ? Number(a.hoursSaved) * Number(a.hourlyRate) * a.seats * 46 : null
-  return { monthly, annual: monthly === null ? null : monthly * 12, gross }
-}
 export const pathDescriptions = {
   'Optimize + Copilot': en["scoring.improve_the_existing_github_foundation_and_scale_responsible_ai"],
   Hybrid: en["scoring.retain_necessary_systems_integrate_deliberately_and_modernize_in_phases"],
