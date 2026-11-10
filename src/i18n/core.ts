@@ -72,35 +72,26 @@ export function formatDate(value: string, locale: Locale) {
 export function formatNumber(value: number, locale: Locale, digits = 0) {
   return new Intl.NumberFormat(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value)
 }
-export function formatAssumption(value: string, locale: Locale) {
-  const parts = /^(\d+)(?:\.(\d+))?$/.exec(value)
-  if (!parts) throw new RangeError('Expected a non-negative decimal assumption.')
-  const integer = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(BigInt(parts[1]))
-  if (parts[2] === undefined) return integer
-  const decimal = new Intl.NumberFormat(locale).formatToParts(1.1).find(part => part.type === 'decimal')
-  if (!decimal) throw new RangeError(`No decimal separator for locale ${locale}`)
-  // Keep fractional digits as text; Number conversion or a fixed digit cap can lose supplied precision.
-  return `${integer}${decimal.value}${parts[2]}`
-}
-export function formatMoney(value: number, locale: Locale) {
-  return new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value)
-}
 
 export function sampleText(sample: boolean, value: string, locale: Locale) {
   const keys: MessageKey[] = [
     'model.sample_facilitator',
-    'model.azure_boards_retained_for_portfolio_planning_eight_production_pipelines',
-    'model.security_approval_required_before_expanding_ai_use_identity_remains',
     'model.illustrative_response_only_replace_with_evidence_gathered_during_a',
   ]
   const key = sample ? keys.find(key => en[key] === value) : undefined
   return key ? translator(locale)(key) : value
 }
-export function platformName(value: string, locale: Locale) {
-  return value === 'github' ? 'GitHub' : value === 'azure-devops' ? 'Azure DevOps' : value === 'mixed' ? 'GitHub + Azure DevOps' : translator(locale)('ui.other_platform')
+export function platformName(value: string, locale: Locale, other = '') {
+  const t = translator(locale)
+  return value === 'github' ? 'GitHub' : value === 'azure-devops' ? 'Azure DevOps'
+    : value === 'gitlab' ? 'GitLab' : value === 'bitbucket' ? 'Bitbucket'
+    : value === 'mixed' ? 'GitHub + Azure DevOps'
+    : value === 'other' ? other.trim() || t('ui.other_platform') : t('profile.select_platform')
 }
 export function planName(value: string, locale: Locale) {
-  return value === 'business' ? 'Copilot Business' : value === 'enterprise' ? 'Copilot Enterprise' : translator(locale)(value === 'none' ? 'ui.not_deployed' : 'ui.not_yet_confirmed')
+  const t = translator(locale)
+  return t(value === 'business' ? 'profile.github_business' : value === 'enterprise' ? 'profile.github_enterprise'
+    : value === 'none' ? 'profile.no_plan' : 'ui.not_yet_confirmed')
 }
 export function hostingName(value: string, locale: Locale) {
   return value === 'cloud' ? 'GitHub Enterprise Cloud' : value === 'server' ? 'GitHub Enterprise Server' : translator(locale)('ui.not_yet_decided')

@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { allQuestions, exampleAssessment, newAssessment, pillars } from './model'
+import { allQuestions, exampleAssessment, isProfileComplete, newAssessment, pillars } from './model'
 import type { Rating } from './model'
-import { assess, businessCase, level, pillarResult, roadmap } from './scoring'
+import { assess, level, pillarResult, roadmap } from './scoring'
 import { reportMarkdown } from './report'
 import { parseSnapshot, validateAssessment } from './storage'
 
 function filled(value: Rating = 2) {
   const a = newAssessment()
   a.customer = 'Test customer'
+  a.platform = 'github'
   a.answers = Object.fromEntries(allQuestions.map(q => [q.id, { value, evidence: '' }]))
   return a
 }
@@ -132,21 +133,35 @@ describe('recommendations', () => {
   })
 })
 
-describe('business scenarios', () => {
-  it('does not invent missing costs or productivity values', () => {
-    expect(businessCase(newAssessment())).toEqual({ monthly: null, annual: null, gross: null })
+describe('customer details', () => {
+  it('requires an explicit platform and a non-blank name for Other', () => {
+    const a = newAssessment()
+    a.customer = 'Test customer'
+    expect(a.platform).toBe('')
+    expect(isProfileComplete(a)).toBe(false)
+    a.platform = 'gitlab'
+    expect(isProfileComplete(a)).toBe(true)
+    a.platform = 'other'
+    for (const name of ['', '   ', '\t']) {
+      a.otherPlatform = name
+      expect(isProfileComplete(a)).toBe(false)
+    }
+    a.otherPlatform = 'Custom SCM'
+    expect(isProfileComplete(a)).toBe(true)
+    a.customer = ' '
+    expect(isProfileComplete(a)).toBe(false)
   })
-  it('calculates only explicit assumptions and preserves legitimate zeros', () => {
+  it.each(['gitlab', 'bitbucket', 'other'] as const)('routes %s to Migrate unless critical controls take precedence', platform => {
     const a = filled()
-    Object.assign(a, { seats: 10, seatCost: '20', hoursSaved: '2', hourlyRate: '50' })
-    expect(businessCase(a)).toEqual({ monthly: 200, annual: 2400, gross: 46000 })
-    a.seatCost = '0'
-    expect(businessCase(a).annual).toBe(0)
+    Object.assign(a, { platform, otherPlatform: platform === 'other' ? 'Custom SCM' : '' })
+    expect(assess(a).path).toBe('Migrate')
+    a.answers.identity.value = 0
+    expect(assess(a).path).toBe('Secure DevOps')
   })
 })
 
 describe('import validation', () => {
-  const wrap = (a: unknown) => JSON.stringify({ schemaVersion: 1, assessments: [a], activeId: (a as { id: string }).id })
+  const wrap = (a: unknown) => JSON.stringify({ schemaVersion: 2, assessments: [a], activeId: (a as { id: string }).id })
   it('round-trips an exported assessment without losing evidence', () => {
     const a = exampleAssessment()
     expect(parseSnapshot(wrap(a)).assessments[0]).toEqual(a)
@@ -169,21 +184,56 @@ describe('import validation', () => {
     a.answers.ownership = { value: 'na', evidence: ' ' }
     expect(() => validateAssessment(a)).toThrow('rationale')
   })
-  it('rejects invalid enums, negative counts, and nonnumeric scenario amounts', () => {
+  it('rejects invalid enums, negative counts, and malformed Other names', () => {
     expect(() => validateAssessment({ ...filled(), platform: 'typo' })).toThrow()
-    expect(() => validateAssessment({ ...filled(), seats: -1 })).toThrow()
     expect(() => validateAssessment({ ...filled(), developers: 1.5 })).toThrow()
-    expect(() => validateAssessment({ ...filled(), seatCost: 'Infinity' })).toThrow()
-    expect(() => validateAssessment({ ...filled(), hoursSaved: '-2' })).toThrow()
+    expect(() => validateAssessment({ ...filled(), developers: -1 })).toThrow()
+    expect(() => validateAssessment({ ...filled(), githubPlan: 'copilot' })).toThrow()
+    expect(() => validateAssessment({ ...filled(), platform: 'other', otherPlatform: null })).toThrow()
+    expect(() => validateAssessment({ ...filled(), platform: 'other', otherPlatform: 'x'.repeat(201) })).toThrow()
   })
   it('rejects a future schema, duplicate IDs, and missing active IDs', () => {
     const a = filled()
-    expect(() => parseSnapshot(JSON.stringify({ schemaVersion: 2, assessments: [], activeId: null }))).toThrow()
+    expect(() => parseSnapshot(JSON.stringify({ schemaVersion: 3, assessments: [], activeId: null }))).toThrow()
     expect(() => parseSnapshot(JSON.stringify({ schemaVersion: 1, assessments: [a, a], activeId: a.id }))).toThrow('Duplicate')
     expect(() => parseSnapshot(JSON.stringify({ schemaVersion: 1, assessments: [a], activeId: 'missing' }))).toThrow('active')
   })
   it('rejects a malformed value in a correctly shaped answer', () => {
     expect(() => validateAssessment({ ...filled(), answers: { identity: { value: 7, evidence: '' } } })).toThrow()
+  })
+  it('migrates v1 exports without misrepresenting Copilot as a GitHub subscription', () => {
+    const a = filled()
+    const legacy = { ...a, copilotPlan: 'enterprise', dependencies: 'Removed integrations', constraints: 'Removed restrictions',
+      seats: 1000, seatCost: '0.004', hoursSaved: '0.004', hourlyRate: '50' }
+    const before = structuredClone(legacy)
+    const migrated = parseSnapshot(JSON.stringify({ schemaVersion: 1, assessments: [legacy], activeId: a.id }))
+    expect(migrated.schemaVersion).toBe(2)
+    expect(migrated.assessments[0].githubPlan).toBe('undecided')
+    expect(migrated.assessments[0].answers).toEqual(a.answers)
+    expect(migrated.assessments[0].otherPlatform).toBe('')
+    for (const field of ['copilotPlan', 'dependencies', 'constraints', 'seats', 'seatCost', 'hoursSaved', 'hourlyRate']) {
+      expect(migrated.assessments[0]).not.toHaveProperty(field)
+    }
+    expect(legacy).toEqual(before)
+  })
+  it('retains v1 Other records as editable drafts instead of inventing their platform name', () => {
+    const a = { ...filled(), platform: 'other' }
+    const migrated = parseSnapshot(JSON.stringify({ schemaVersion: 1, assessments: [a], activeId: a.id })).assessments[0]
+    expect(migrated.platform).toBe('other')
+    expect(migrated.otherPlatform).toBe('')
+    expect(isProfileComplete(migrated)).toBe(false)
+  })
+  it('strips removed fields from v2 imports and clears hidden Other data', () => {
+    const a = { ...filled(), otherPlatform: 'Not selected', dependencies: 'Removed', copilotPlan: 'business', seatCost: '123' }
+    const cleaned = parseSnapshot(wrap(a)).assessments[0]
+    expect(cleaned.otherPlatform).toBe('')
+    expect(cleaned).not.toHaveProperty('dependencies')
+    expect(cleaned).not.toHaveProperty('copilotPlan')
+    expect(cleaned).not.toHaveProperty('seatCost')
+  })
+  it.each(['business', 'enterprise', 'undecided', 'none'] as const)('round-trips the GitHub %s plan without modifying answers', githubPlan => {
+    const a = { ...filled(), platform: 'other' as const, otherPlatform: 'São Paulo SCM / Bogotá', githubPlan }
+    expect(parseSnapshot(wrap(a)).assessments[0]).toEqual(a)
   })
 })
 
@@ -191,11 +241,12 @@ describe('reports', () => {
   it('includes the required deliverables and transparent limitations', () => {
     const report = reportMarkdown(exampleAssessment())
     for (const section of ['SYNTHETIC SAMPLE', 'Executive summary', 'Current state', 'Maturity by dimension', 'Findings & recommendations',
-      'Architecture', '30/60/90-day roadmap', 'Pilot / POV', 'Business case', 'Response and evidence register', 'Methodology & limitations']) {
+      'Architecture', '30/60/90-day roadmap', 'Pilot / POV', 'Response and evidence register', 'Methodology & limitations']) {
       expect(report).toContain(section)
     }
     expect(report).toContain('not an official GitHub')
-    expect(report).toContain('License cost not estimated')
+    expect(report).toContain('GitHub Enterprise')
+    for (const removed of ['Business case', 'License cost', 'Dependencies:', 'Constraints:', 'Copilot plan:']) expect(report).not.toContain(removed)
   })
   it('labels incomplete exports and includes unscored notes', () => {
     const a = newAssessment()

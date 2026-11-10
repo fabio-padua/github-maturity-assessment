@@ -20,7 +20,7 @@ test('sample dashboard, mobile layout, and report exports', async ({ page }, tes
   await page.screenshot({ path: testInfo.outputPath('dashboard.png'), fullPage: true })
   await page.getByRole('button', { name: 'Report & roadmap' }).click()
   await expect(page.getByRole('heading', { name: 'Decision matrix' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Business case & licensing scenario' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Business case & licensing scenario' })).toHaveCount(0)
   await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')))
   await expect(page.locator('.evidence-register details[open]')).toHaveCount(6)
   await page.evaluate(() => window.dispatchEvent(new Event('afterprint')))
@@ -51,10 +51,7 @@ test('complete a customer assessment, retain unknown evidence, validate N/A, and
   await page.getByLabel('Customer / organization *').fill('Contoso Customer')
   await page.getByLabel('Facilitator', { exact: true }).fill('Test consultant')
   await page.getByLabel('Current development platform').selectOption('mixed')
-  await page.getByLabel('Proposed Copilot seats').fill('20')
-  await page.getByLabel('Monthly price per Copilot seat (USD)').fill('10')
-  await page.getByLabel('Assumed hours saved / seat / week').fill('1')
-  await page.getByLabel('Loaded hourly rate (USD)').fill('50')
+  await page.getByLabel('Current GitHub plan').selectOption('business')
   await page.getByRole('button', { name: 'Continue to questions' }).click()
   await page.getByLabel('Evidence & session notes').fill('Identity owner to confirm.')
   await page.getByRole('button', { name: 'Next question' }).click()
@@ -87,8 +84,7 @@ test('complete a customer assessment, retain unknown evidence, validate N/A, and
   await expect(page.getByText('Complete · self-reported')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Hybrid', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Report & roadmap' }).click()
-  await expect(page.getByText('$2,400', { exact: true })).toBeVisible()
-  await expect(page.getByText('$46,000', { exact: true })).toBeVisible()
+  await expect(page.getByText('GitHub Business', { exact: true }).first()).toBeVisible()
   await page.reload()
   await expect(page.getByText('Complete · self-reported')).toBeVisible()
   await page.getByRole('button', { name: 'Assessments', exact: true }).click()
@@ -98,7 +94,7 @@ test('complete a customer assessment, retain unknown evidence, validate N/A, and
 test('imports as independent copies, rejects malformed files, and deletes only confirmed records', async ({ page }) => {
   await page.goto('/')
   const sample = exampleAssessment()
-  const file = Buffer.from(JSON.stringify({ schemaVersion: 1, assessments: [sample], activeId: sample.id }))
+  const file = Buffer.from(JSON.stringify({ schemaVersion: 2, assessments: [sample], activeId: sample.id }))
   await page.getByLabel('Import assessment JSON file').setInputFiles({ name: 'customer.json', mimeType: 'application/json', buffer: file })
   await expect(page.getByRole('status')).toContainText('Imported 1 assessment')
   await page.getByLabel('Import assessment JSON file').setInputFiles({ name: 'customer.json', mimeType: 'application/json', buffer: file })
@@ -115,6 +111,28 @@ test('imports as independent copies, rejects malformed files, and deletes only c
   page.once('dialog', dialog => dialog.accept())
   await page.getByRole('button', { name: 'Delete Northstar Engineering' }).first().click()
   await expect(page.getByRole('heading', { name: 'Northstar Engineering' })).toHaveCount(1)
+})
+
+test('migrates existing local v1 assessments without reusing the Copilot plan or deleted fields', async ({ page }) => {
+  const legacy = { ...exampleAssessment(), copilotPlan: 'business', dependencies: 'Removed integrations',
+    constraints: 'Removed restrictions', seats: 10, seatCost: '20', hoursSaved: '2', hourlyRate: '50' }
+  await page.addInitScript(({ key, legacy }) => {
+    if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify({ schemaVersion: 1, assessments: [legacy], activeId: legacy.id }))
+  }, { key: storageKey, legacy })
+  await page.goto('/')
+  await expect(page.getByText('Complete · self-reported')).toBeVisible()
+  await page.getByRole('button', { name: 'Questionnaire', exact: true }).click()
+  await expect(page.getByLabel('Current GitHub plan')).toHaveValue('undecided')
+  await page.getByLabel('Current GitHub plan').selectOption('enterprise')
+  await page.reload()
+  await page.getByRole('button', { name: 'Questionnaire', exact: true }).click()
+  await expect(page.getByLabel('Current GitHub plan')).toHaveValue('enterprise')
+  const data = await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), storageKey)
+  expect(data.schemaVersion).toBe(2)
+  expect(data.assessments[0].answers).toEqual(legacy.answers)
+  for (const field of ['copilotPlan', 'dependencies', 'constraints', 'seats', 'seatCost', 'hoursSaved', 'hourlyRate']) {
+    expect(data.assessments[0]).not.toHaveProperty(field)
+  }
 })
 
 test('preserves corrupt browser data instead of silently overwriting it', async ({ page }) => {

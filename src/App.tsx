@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, ReactNode } from 'react'
-import { exampleAssessment, isAnswered, newAssessment } from './model'
+import { exampleAssessment, isAnswered, isProfileComplete, newAssessment } from './model'
 import type { Assessment, Rating } from './model'
-import { businessCase, methodologyVersion } from './scoring'
-import { demoMode, loadSnapshot, parseSnapshot, storageKey } from './storage'
+import { methodologyVersion } from './scoring'
+import { demoMode, loadSnapshot, parseSnapshot, schemaVersion, storageKey } from './storage'
 import type { Snapshot } from './storage'
 import { download, fileStem, reportMarkdown } from './report'
 import './App.css'
@@ -94,24 +94,25 @@ function Profile({ a, update, begin }: {
   return <section className="panel profile">
   <div className="section-heading"><div><h2>{t("ui.start_with_the_current_state")}</h2><p>{t("ui.a_little_context_makes_the_recommendations_more_useful")}</p></div><span className="tag">{t("ui.customer_profile")}</span></div>
   <div className="form-grid">
-    <Field label={t("ui.customer_organization")}><input value={a.customer} maxLength={200} onChange={e => update({ customer: e.target.value })} placeholder={t("ui.e_g_contoso_engineering")} autoComplete={demoMode ? 'off' : 'organization'}/></Field>
+    <Field label={t("ui.customer_organization")}><input required value={a.customer} maxLength={200} onChange={e => update({ customer: e.target.value })} placeholder={t("ui.e_g_contoso_engineering")} autoComplete={demoMode ? 'off' : 'organization'}/></Field>
     <Field label={t("ui.facilitator")}><input value={sampleText(a, a.facilitator)} maxLength={200} onChange={e => update({ facilitator: e.target.value })} placeholder={t("ui.your_name")} autoComplete={demoMode ? 'off' : 'name'}/></Field>
     <Field label={t("ui.assessment_date")}><input type="date" value={a.date} onChange={e => {
       if (e.target.value)
         update({ date: e.target.value })
     }}/></Field>
     <NumberField label={t("ui.number_of_developers")} value={a.developers || ''} integer onChange={v => update({ developers: Number(v) })} hint={t("ui.leave_blank_if_not_yet_known")}/>
-    <Field label={t("ui.current_development_platform")}><select value={a.platform} onChange={e => update({ platform: e.target.value as Assessment['platform'] })}>
+    <Field label={t("ui.current_development_platform")}><select required value={a.platform} onChange={e => update({ platform: e.target.value as Assessment['platform'], otherPlatform: '' })}>
+    <option value="">{t("profile.select_platform")}</option>
     {Object.entries(platformLabels).map(([v, label]) => <option key={v} value={v}>{label}</option>)}</select></Field>
+    {a.platform === 'other' && <Field label={t("profile.other_platform")} hint={t("profile.other_platform_hint")}>
+      <input required maxLength={200} value={a.otherPlatform} onChange={e => update({ otherPlatform: e.target.value })} />
+    </Field>}
     <Field label={t("ui.target_github_hosting")}><select value={a.hosting} onChange={e => update({ hosting: e.target.value as Assessment['hosting'] })}>
     <option value="undecided">{t("ui.not_yet_decided")}</option><option value="cloud">{t("ui.github_enterprise_cloud")}</option><option value="server">{t("ui.github_enterprise_server")}</option></select></Field>
-    <Field label={t("ui.current_copilot_plan")}><select value={a.copilotPlan} onChange={e => update({ copilotPlan: e.target.value as Assessment['copilotPlan'] })}>
-    <option value="undecided">{t("ui.not_yet_confirmed")}</option><option value="none">{t("ui.not_deployed")}</option><option value="business">{t("ui.copilot_business")}</option><option value="enterprise">{t("ui.copilot_enterprise")}</option></select></Field>
-    <NumberField label={t("ui.proposed_copilot_seats")} value={a.seats || ''} integer onChange={v => update({ seats: Number(v) })}/>
-    <Field label={t("ui.integrations_dependencies")} hint={t("ui.boards_pipelines_packages_identity_providers_and_external_systems")}><textarea rows={3} maxLength={20000} value={sampleText(a, a.dependencies)} onChange={e => update({ dependencies: e.target.value })} placeholder={t("ui.what_needs_to_stay_connected")}/></Field>
-    <Field label={t("ui.constraints_decision_criteria")} hint={t("ui.residency_compliance_networking_budgets_or_important_deadlines")}><textarea rows={3} maxLength={20000} value={sampleText(a, a.constraints)} onChange={e => update({ constraints: e.target.value })} placeholder={t("ui.what_must_the_target_architecture_respect")}/></Field>
+    <Field label={t("profile.current_plan")}><select value={a.githubPlan} onChange={e => update({ githubPlan: e.target.value as Assessment['githubPlan'] })}>
+    <option value="undecided">{t("ui.not_yet_confirmed")}</option><option value="none">{t("profile.no_plan")}</option><option value="business">{t("profile.github_business")}</option><option value="enterprise">{t("profile.github_enterprise")}</option></select></Field>
   </div>
-  <div className="form-footer"><p>{t("ui.30_questions_six_dimensions_no_external_data_collection")}</p><Button onClick={begin} disabled={!a.customer.trim()} icon="arrow">{t("ui.continue_to_questions")}</Button></div>
+  <div className="form-footer"><p>{isProfileComplete(a) ? t("ui.30_questions_six_dimensions_no_external_data_collection") : t("profile.required")}</p><Button onClick={begin} disabled={!isProfileComplete(a)} icon="arrow">{t("ui.continue_to_questions")}</Button></div>
   </section>
 }
 function Questionnaire({ a, update, questionIndex, setQuestionIndex, onFinish }: {
@@ -260,9 +261,8 @@ function Report({ a, exportReport, go }: {
   exportReport: () => void
   go: (view: View) => void
 }) {
-  const { t, assess, level, formatMoney, platformLabels, pathDescriptions, content, pillars, sampleText, date, planLabel, hostingLabel, number, assumption } = useI18n()
+  const { t, assess, level, platformLabel, pathDescriptions, content, pillars, sampleText, date, planLabel, hostingLabel } = useI18n()
   const r = assess(a)
-  const b = businessCase(a)
   useEffect(() => {
     let collapsed: HTMLDetailsElement[] = []
     const beforePrint = () => {
@@ -281,22 +281,17 @@ function Report({ a, exportReport, go }: {
   <div className="page-intro"><div><h1>{a.customer || t("ui.customer")}<br /><span>{t("ui.assessment_action_plan")}</span></h1><p>{date(a.date)} · {sampleText(a, a.facilitator) || t("ui.facilitator_not_specified")}{t("ui.methodology")}{methodologyVersion}</p></div><div className="actions no-print"><Button secondary icon="download" onClick={exportReport}>{t("ui.export_markdown")}</Button><Button icon="report" onClick={() => window.print()}>{t("ui.print_save_pdf")}</Button></div></div>
   {!r.complete && <div className="notice no-print"><Icon name="info"/><p><strong>{t("ui.provisional_report")}</strong> {t("report.remaining", { count: r.total - r.answered })}</p><button className="text-button" onClick={() => go('assessment')}>{t("ui.complete_assessment")}</button></div>}
   <section className="panel report-summary"><h2>{t("ui.executive_summary")}</h2><p>{t("report.summary", { score: r.score === null ? t("ui.not_assessed") : `${Math.round(r.score)}/100 · ${level(r.score)}`, coverage: r.coverage, evidence: r.evidence, rated: r.rated })}</p><p><strong>{t("ui.recommended_path")}{content(r.path)}.</strong> {r.rationale}</p><p className="muted">{t("ui.this_is_a_custom_advisory_framework_based_on_self")}</p></section>
-  <section className="panel"><h2>{t("ui.current_state_maturity")}</h2><div className="context-summary"><div><span>{t("ui.platform")}</span><strong>{platformLabels[a.platform]}</strong></div><div><span>{t("ui.hosting_target")}</span><strong>{a.hosting === 'undecided' ? t("ui.to_be_confirmed") : a.hosting === 'cloud' ? t("ui.enterprise_cloud") : t("ui.enterprise_server")}</strong></div><div><span>{t("ui.developers")}</span><strong>{a.developers || t("ui.not_specified")}</strong></div><div><span>{t("ui.copilot")}</span><strong>{planLabel(a.copilotPlan)}</strong></div></div><DimensionTable a={a}/>
-    <div className="context-notes"><div><h3>{t("ui.dependencies")}</h3><p>{sampleText(a, a.dependencies) || t("ui.not_yet_documented")}</p></div><div><h3>{t("ui.constraints")}</h3><p>{sampleText(a, a.constraints) || t("ui.not_yet_documented")}</p></div></div>
+  <section className="panel"><h2>{t("ui.current_state_maturity")}</h2><div className="context-summary"><div><span>{t("ui.platform")}</span><strong>{platformLabel(a)}</strong></div><div><span>{t("ui.hosting_target")}</span><strong>{a.hosting === 'undecided' ? t("ui.to_be_confirmed") : a.hosting === 'cloud' ? t("ui.enterprise_cloud") : t("ui.enterprise_server")}</strong></div><div><span>{t("ui.developers")}</span><strong>{a.developers || t("ui.not_specified")}</strong></div><div><span>{t("profile.current_plan")}</span><strong>{planLabel(a.githubPlan)}</strong></div></div><DimensionTable a={a}/>
   </section>
   <section className="panel"><div className="section-heading"><h2>{t("ui.decision_matrix")}</h2><span className="tag">{t("ui.rule_based_recommendation")}</span></div>
     <div className="decision-matrix">{Object.entries(pathDescriptions).map(([path, description]) => <div key={path} className={r.path === path ? 'recommended' : ''}><h3>{content(path)}{r.path === path && <Icon name="check" size={17}/>}</h3><p>{description}</p><span>{r.path === path ? t("ui.recommended_first") : t("ui.alternative_subsequent_workstream")}</span></div>)}</div>
   </section>
   <section className="panel"><h2>{t("ui.findings_recommendations")}</h2><Findings a={a}/></section>
   <section className="panel"><div className="section-heading"><div><h2>{t("ui.architecture_from_as_is_to_to_be")}</h2><p>{t("ui.conceptual_target_for_validation_not_an_approved_solution_design")}</p></div></div>
-    <div className="architecture"><div><span className="tag">{t("ui.as_is")}</span><h3>{platformLabels[a.platform]}</h3><p>{t("report.hosting_plan", { hosting: hostingLabel(a.hosting), plan: planLabel(a.copilotPlan) })}</p><p>{sampleText(a, a.dependencies) || t("ui.inventory_integrations_and_platform_boundaries")}</p></div><Icon name="arrow" size={28}/><div><span className="tag success-tag">{t("ui.proposed_to_be")}</span><h3>{t("ui.governed_github_responsible_ai")}</h3><p>{t("ui.central_identity_reviewed_repositories_reusable_ci_cd_protected_environments")}</p><p>{r.path === 'Hybrid' ? t("ui.retain_required_systems_behind_documented_integration_boundaries") : t("ui.validate_migration_boundaries_hosting_eligibility_and_integration_compatibility")}{t("ui.governed_copilot_supports_the_engineering_workflow")}</p></div></div>
+    <div className="architecture"><div><span className="tag">{t("ui.as_is")}</span><h3>{platformLabel(a)}</h3><p>{t("report.hosting_plan", { hosting: hostingLabel(a.hosting), plan: planLabel(a.githubPlan) })}</p></div><Icon name="arrow" size={28}/><div><span className="tag success-tag">{t("ui.proposed_to_be")}</span><h3>{t("ui.governed_github_responsible_ai")}</h3><p>{t("ui.central_identity_reviewed_repositories_reusable_ci_cd_protected_environments")}</p><p>{r.path === 'Hybrid' ? t("ui.retain_required_systems_behind_documented_integration_boundaries") : t("ui.validate_migration_boundaries_hosting_eligibility_and_integration_compatibility")}{t("ui.governed_copilot_supports_the_engineering_workflow")}</p></div></div>
   </section>
   <section className="panel roadmap-panel"><div className="section-heading"><h2>{t("ui.your_30_60_90_day_roadmap")}</h2><span className="tag">{t("ui.suggested_owners_exit_criteria")}</span></div><Roadmap a={a}/></section>
   <section className="panel"><h2>{t("ui.pilot_pov_deployment_plan")}</h2><div className="pilot-plan"><div><h3>{t("ui.scope")}</h3><p>{t("ui.one_representative_team_and_a_non_critical_workload_with")}</p></div><div><h3>{t("ui.guardrails")}</h3><p>{t("ui.confirm_identity_data_handling_approved_ai_policy_support_and")}</p></div><div><h3>{t("ui.success_criteria")}</h3><p>{t("ui.baseline_developer_friction_adoption_delivery_and_quality_agree_on")}</p></div></div><p className="muted">{t("ui.review_at_day_60_expand_only_when_customer_approved")}</p></section>
-  <section className="panel"><div className="section-heading"><div><h2>{t("ui.business_case_licensing_scenario")}</h2><p>{t("ui.customer_provided_assumptions_only_edit_these_in_the_questionnaire")}</p></div><button className="text-button no-print" onClick={() => go('assessment')}>{t("ui.edit_assumptions")}<Icon name="arrow" size={15}/></button></div>
-    <div className="business-results"><div><span>{t("ui.proposed_seats")}</span><strong>{a.seats}</strong></div><div><span>{t("ui.annual_license_only_scenario")}</span><strong>{b.annual === null ? t("ui.not_estimated") : formatMoney(b.annual)}</strong></div><div><span>{t("ui.illustrative_gross_capacity_value_year")}</span><strong>{b.gross === null ? t("ui.not_estimated") : formatMoney(b.gross)}</strong></div></div>
-    <p className="muted small">{b.annual !== null && t("ui.seats_usd_month_12", { p1: number(a.seats), p2: assumption(a.seatCost) })}{b.gross !== null && t("ui.seats_hours_week_usd_hour_46_weeks", { p1: number(a.seats), p2: assumption(a.hoursSaved), p3: assumption(a.hourlyRate) })}{t("ui.not_a_quote_guaranteed_savings_or_roi_excludes_implementation")}</p>
-  </section>
   <section className="panel evidence-register"><h2>{t("ui.response_evidence_register")}</h2>{pillars.map(p => <details key={p.id}><summary>{p.name}<span>{t("counts.answers", { count: p.questions.filter(q => isAnswered(a, q.id)).length, total: 5 })}</span></summary>{p.questions.map(q => {
         const answer = a.answers[q.id]
         return <div className="evidence-item" key={q.id}><h3>{q.title}</h3><p>{!answer || answer.value === null ? t("ui.unanswered") : answer.value === 'na' ? t("ui.not_applicable") : t("ui.4", { p1: answer.value, p2: q.options[answer.value] })}</p><p className="muted">{t("ui.evidence_rationale")}{sampleText(a, answer?.evidence ?? '') || t("ui.not_supplied")}</p></div>
@@ -314,13 +309,16 @@ function Methodology() {
   </div>
 }
 export default function App() {
-  const { t, assess, level, allQuestions, platformLabels, locale, date } = useI18n()
+  const { t, assess, level, allQuestions, platformLabel, locale, date } = useI18n()
   const [loaded] = useState(loadSnapshot)
   const [snapshot, replaceSnapshot] = useState<Snapshot>(loaded.snapshot)
   const [blocked, setBlocked] = useState(Boolean(loaded.error))
   const [storageError, setStorageError] = useState(loaded.error)
   const titles: Record<View, string> = { overview: t('ui.maturity_overview'), assessment: t('ui.customer_assessment'), report: t('ui.assessment_report'), library: t('ui.your_assessments'), methodology: t('ui.scoring_methodology') }
-  const [view, setView] = useState<View>('overview')
+  const [view, setView] = useState<View>(() => {
+    const a = loaded.snapshot.assessments.find(a => a.id === loaded.snapshot.activeId)
+    return a && !isProfileComplete(a) ? 'assessment' : 'overview'
+  })
   const [questionIndex, setQuestionIndex] = useState(-1)
   const [message, setMessage] = useState<Message | null>(null)
   const [saved, setSaved] = useState(!loaded.error)
@@ -378,6 +376,11 @@ export default function App() {
     setMessage(null)
   }
   const go = (next: View) => {
+    if (active && !isProfileComplete(active) && (next === 'overview' || next === 'report')) {
+      setView('assessment')
+      setQuestionIndex(-1)
+      return
+    }
     setView(next)
     if (next === 'assessment')
       setQuestionIndex(-1)
@@ -386,13 +389,13 @@ export default function App() {
     if (!active)
       return
     const next = allQuestions.findIndex(q => !isAnswered(active, q.id))
-    setQuestionIndex(active.customer.trim() ? next < 0 ? 0 : next : -1)
+    setQuestionIndex(isProfileComplete(active) ? next < 0 ? 0 : next : -1)
     setView('assessment')
   }
   const exportJson = (all = false) => {
     const selected = all ? snapshot.assessments : active ? [active] : snapshot.assessments
     download(`${all ? 'all-assessments' : fileStem(active?.customer || '')}.json`, JSON.stringify({
-      schemaVersion: 1, assessments: selected, activeId: selected.some(a => a.id === snapshot.activeId) ? snapshot.activeId : selected[0]?.id ?? null,
+      schemaVersion, assessments: selected, activeId: selected.some(a => a.id === snapshot.activeId) ? snapshot.activeId : selected[0]?.id ?? null,
     }, null, 2), 'application/json')
   }
   const importJson = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -410,8 +413,9 @@ export default function App() {
         throw new AssessmentError("ui.import_would_exceed_the_200_assessment_limit")
       const copies = imported.assessments.map(a => ({ ...a, id: crypto.randomUUID() }))
       const index = imported.assessments.findIndex(a => a.id === imported.activeId)
-      setSnapshot(s => ({ schemaVersion: 1, assessments: [...s.assessments, ...copies], activeId: copies[Math.max(index, 0)].id }))
-      setView('overview')
+      setSnapshot(s => ({ schemaVersion, assessments: [...s.assessments, ...copies], activeId: copies[Math.max(index, 0)].id }))
+      setQuestionIndex(-1)
+      setView(isProfileComplete(copies[Math.max(index, 0)]) ? 'overview' : 'assessment')
       setMessage(m(copies.length === 1 ? "counts.import_one" : "counts.import_other", { count: copies.length }))
     }
     catch (error) {
@@ -478,17 +482,18 @@ export default function App() {
       <div className="library-toolbar"><span>{snapshot.assessments.length} {demoMode ? t("ui.in_this_demo_session") : t("ui.saved_on_this_browser")}</span><div className="actions"><Button secondary icon="upload" onClick={() => fileInput.current?.click()} disabled={blocked}>{t("ui.import_json")}</Button><Button secondary icon="download" onClick={() => exportJson(true)} disabled={!snapshot.assessments.length}>{t("ui.export_all")}</Button></div></div>
       {!snapshot.assessments.length ? <div className="panel empty-library"><Icon name="folder" size={36}/><h2>{t("ui.a_clean_slate")}</h2><p>{t("ui.create_your_first_assessment_or_import_an_exported_json")}</p></div> : <div className="assessment-list">{snapshot.assessments.map(a => {
           const r = assess(a)
-          return <article className="assessment-list-item" key={a.id}><div className="customer-avatar">{(a.customer || 'U').slice(0, 2).toUpperCase()}</div><div><h2>{a.customer || t("ui.untitled_assessment")}{a.sample && <span className="tag">{t("ui.sample")}</span>}</h2><p>{date(a.date)} · {platformLabels[a.platform]} · {t("counts.answers", { count: r.answered, total: r.total })}</p></div><div className="library-score"><strong>{r.score === null ? '—' : Math.round(r.score)}</strong><small>{r.complete ? level(r.score) : t("ui.provisional")}</small></div><Button secondary onClick={() => { setSnapshot(s => ({ ...s, activeId: a.id })); setView('overview'); }} disabled={blocked}>{t("ui.open")}</Button><button className="icon-button danger-text" onClick={() => remove(a)} disabled={blocked} aria-label={t("ui.delete", { p1: a.customer || t("ui.untitled_assessment_2") })}><Icon name="trash" size={18}/></button></article>
+          return <article className="assessment-list-item" key={a.id}><div className="customer-avatar">{(a.customer || 'U').slice(0, 2).toUpperCase()}</div><div><h2>{a.customer || t("ui.untitled_assessment")}{a.sample && <span className="tag">{t("ui.sample")}</span>}</h2><p>{date(a.date)} · {platformLabel(a)} · {t("counts.answers", { count: r.answered, total: r.total })}</p></div><div className="library-score"><strong>{r.score === null ? '—' : Math.round(r.score)}</strong><small>{r.complete ? level(r.score) : t("ui.provisional")}</small></div><Button secondary onClick={() => { setSnapshot(s => ({ ...s, activeId: a.id })); setQuestionIndex(-1); setView(isProfileComplete(a) ? 'overview' : 'assessment'); }} disabled={blocked}>{t("ui.open")}</Button><button className="icon-button danger-text" onClick={() => remove(a)} disabled={blocked} aria-label={t("ui.delete", { p1: a.customer || t("ui.untitled_assessment_2") })}><Icon name="trash" size={18}/></button></article>
         })}</div>}
     </> : !active ? <div className="welcome">
       <div className="welcome-symbol"><Icon name="github" size={48}/></div><h1>{t("ui.a_clearer_path_to")}<br /><span>{t("ui.github_maturity")}</span></h1><p>{t("ui.turn_a_customer_conversation_into_a_practical_modernization_plan")}</p><div className="actions"><Button icon="plus" onClick={() => add(false)} disabled={blocked}>{t("ui.start_an_assessment")}</Button><Button secondary icon="grid" onClick={() => add(true)} disabled={blocked}>{t("ui.explore_sample_dashboard")}</Button></div><div className="welcome-flow"><span><strong>{t("ui.understand")}</strong>{t("ui.30_guided_questions")}</span><Icon name="arrow"/><span><strong>{t("ui.assess")}</strong>{t("ui.six_maturity_dimensions")}</span><Icon name="arrow"/><span><strong>{t("ui.act")}</strong>{t("ui.a_30_60_90_day_roadmap")}</span></div><div className="welcome-note"><Icon name="shield" size={18}/><span>{demoMode ? t("ui.demo_answers_are_not_saved_refreshing_starts_a_clean") : t("ui.answers_stay_in_this_browser_no_sign_in_or")}<br />{t("ui.a_custom_advisory_framework_not_an_official_github_certification")}</span></div><button className="text-button" onClick={() => fileInput.current?.click()} disabled={blocked}>{t("ui.already_have_an_assessment_import_json")}<Icon name="upload" size={15}/></button>
-    </div> : view === 'overview' ? <Overview a={active} go={go} resume={resume}/>
-      : view === 'assessment' ? <>
+    </div> : view === 'overview' && isProfileComplete(active) ? <Overview a={active} go={go} resume={resume}/>
+      : view === 'assessment' || !isProfileComplete(active) ? <>
       <div className="page-intro compact"><div><h1>{questionIndex < 0 ? t("ui.set_the_scene") : t("ui.understand_the_current_state")}</h1><p>{active.customer || t("ui.new_customer")}{t("ui.honest_answers_make_useful_recommendations")}</p></div><span className="tag">{t("counts.answers", { count: result?.answered, total: allQuestions.length })}</span></div>
-      <fieldset className="editing-boundary" disabled={blocked}>{questionIndex < 0 ? <>
-        <Profile a={active} update={update} begin={() => setQuestionIndex(Math.max(0, allQuestions.findIndex(q => !isAnswered(active, q.id))))}/>
-        <section className="panel assumptions"><h2>{t("ui.optional_business_case_assumptions")}</h2><p>{t("ui.use_your_customer_s_contracted_or_proposed_price_not")}</p><div className="form-grid three-columns"><NumberField label={t("ui.monthly_price_per_copilot_seat_usd")} value={active.seatCost} onChange={v => update({ seatCost: v })}/><NumberField label={t("ui.assumed_hours_saved_seat_week")} value={active.hoursSaved} onChange={v => update({ hoursSaved: v })}/><NumberField label={t("ui.loaded_hourly_rate_usd")} value={active.hourlyRate} onChange={v => update({ hourlyRate: v })}/></div><p className="small muted">{t("ui.illustrative_capacity_value_uses_46_working_weeks_it_is")}</p></section>
-      </> : <Questionnaire key={questionIndex} a={active} update={update} questionIndex={questionIndex} setQuestionIndex={setQuestionIndex} onFinish={() => go('overview')}/>}</fieldset>
+      <fieldset className="editing-boundary" disabled={blocked}>{questionIndex < 0 || !isProfileComplete(active) ?
+        <Profile a={active} update={update} begin={() => {
+          if (isProfileComplete(active)) setQuestionIndex(Math.max(0, allQuestions.findIndex(q => !isAnswered(active, q.id))))
+        }}/>
+       : <Questionnaire key={questionIndex} a={active} update={update} questionIndex={questionIndex} setQuestionIndex={setQuestionIndex} onFinish={() => go('overview')}/>}</fieldset>
       </> : <Report a={active} exportReport={exportReport} go={go}/>}
     <footer className="page-footer"><span>{t("ui.github_maturity_assessment")}<span>·</span>{t("ui.advisory_framework_v")}{methodologyVersion}</span><span>{t("ui.clarity_before_change")}</span></footer>
     </main>

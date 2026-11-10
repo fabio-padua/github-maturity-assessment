@@ -1,19 +1,18 @@
 import { pillars, ratingNames } from './model'
 import type { Assessment } from './model'
-import { assess, businessCase, level, methodologyVersion, roadmap } from './scoring'
-import { contentTranslator, formatDate, formatNumber, formatAssumption, hostingName, planName, platformName, sampleText, translator } from './i18n/core'
+import { assess, level, methodologyVersion, roadmap } from './scoring'
+import { contentTranslator, formatDate, formatNumber, hostingName, planName, platformName, sampleText, translator } from './i18n/core'
 import type { Locale } from './i18n/core'
 
 export function reportMarkdown(a: Assessment, locale: Locale = 'en') {
   const r = assess(a)
-  const b = businessCase(a)
   const t = translator(locale)
   const c = contentTranslator(locale)
   const safe = (text: string) => text.replace(/[\r\n|]/g, ' ').replace(/[<>]/g, '')
   const userText = (value: string) => safe(sampleText(a.sample, value, locale))
   const score = (value: number | null) => value === null ? t('ui.not_assessed') : `${formatNumber(Math.round(value), locale)}/100`
   const context = {
-    platform: platformName(a.platform, locale), hosting: hostingName(a.hosting, locale), plan: planName(a.copilotPlan, locale),
+    platform: safe(platformName(a.platform, locale, a.otherPlatform)), hosting: hostingName(a.hosting, locale), plan: planName(a.githubPlan, locale),
   }
   const heading = (text: string) => `## ${text}`
   return [
@@ -28,8 +27,6 @@ export function reportMarkdown(a: Assessment, locale: Locale = 'en') {
     t('report.path', { path: c(r.path), rationale: c(r.rationale) }),
     '', heading(t('ui.current_state_maturity')), '',
     t('report.context', { ...context, developers: a.developers ? formatNumber(a.developers, locale) : t('ui.not_specified') }),
-    t('report.dependencies', { text: userText(a.dependencies || t('ui.not_yet_documented')) }),
-    t('report.constraints', { text: userText(a.constraints || t('ui.not_yet_documented')) }),
     '', heading(t('ui.maturity_by_dimension')), '',
     t('report.dimension_weight_score_level_rated_applicable'),
     '| --- | --- | --- | --- | --- |',
@@ -49,13 +46,6 @@ export function reportMarkdown(a: Assessment, locale: Locale = 'en') {
     ]),
     heading(t('ui.pilot_pov_deployment_plan')), '',
     t('report.select_one_representative_team_and_non_critical_workload_baseline'),
-    '', heading(t('ui.business_case_licensing_scenario')), '',
-    t('report.seats', { seats: a.seats, plan: context.plan }),
-    b.annual === null ? t('report.license_cost_not_estimated_enter_a_customer_provided_monthly')
-      : t('report.annual', { price: formatAssumption(a.seatCost, locale), annual: formatNumber(b.annual, locale, 2) }),
-    b.gross === null ? t('report.productivity_scenario_not_estimated_hours_and_loaded_hourly_rate')
-      : t('report.capacity', { gross: formatNumber(b.gross, locale, 2), hours: formatAssumption(a.hoursSaved, locale), rate: formatAssumption(a.hourlyRate, locale), seats: a.seats }),
-    t('report.these_are_user_supplied_scenarios_not_a_quote_guaranteed'),
     '', heading(t('report.register')), '',
     ...pillars.flatMap(p => [`### ${c(p.name)}`, ...p.questions.flatMap(q => {
       const answer = a.answers[q.id]

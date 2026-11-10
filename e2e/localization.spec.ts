@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
-import { languageNames, locales, translator, formatMoney } from '../src/i18n/core'
+import { languageNames, locales, translator } from '../src/i18n/core'
 import type { Locale } from '../src/i18n/core'
+import { exampleAssessment } from '../src/model'
 
 async function switchLanguage(page: import('@playwright/test').Page, current: Locale, next: Locale) {
   await page.getByRole('button', { name: translator(current)('language.menu'), exact: true }).click()
@@ -10,41 +11,105 @@ async function switchLanguage(page: import('@playwright/test').Page, current: Lo
   await expect(page.getByRole('menu')).toHaveCount(0)
 }
 
-test('preserves supplied assumption precision in Markdown and printable reports in every language', async ({ page }) => {
+test('legacy Other imports ask for the missing platform name without losing responses', async ({ page }) => {
+  const original = { ...exampleAssessment(), platform: 'other', copilotPlan: 'enterprise',
+    dependencies: 'Removed integrations', constraints: 'Removed restrictions', seats: 1, seatCost: '20', hoursSaved: '2', hourlyRate: '50' }
   await page.goto('/')
-  await page.getByRole('button', { name: 'Start an assessment', exact: true }).click()
-  await page.getByLabel('Customer / organization *').fill('Precision regression')
-  await page.getByLabel('Proposed Copilot seats').fill('1000')
-  await page.getByLabel('Monthly price per Copilot seat (USD)').fill('0.00400')
-  await page.getByLabel('Assumed hours saved / seat / week').fill('0.004')
-  await page.getByLabel('Loaded hourly rate (USD)').fill('50.0000')
-  await page.getByRole('button', { name: 'Report & roadmap', exact: true }).click()
-  let current: Locale = 'en'
-  for (const locale of locales) {
-    if (current !== locale) await switchLanguage(page, current, locale)
-    current = locale
+  await page.getByLabel('Import assessment JSON file').setInputFiles({
+    name: 'legacy.json', mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify({ schemaVersion: 1, assessments: [original], activeId: original.id })),
+  })
+  await expect(page.getByLabel('Current GitHub plan')).toHaveValue('undecided')
+  await expect(page.getByRole('button', { name: 'Continue to questions', exact: true })).toBeDisabled()
+  await page.getByLabel('Platform name *').fill('Legacy SCM')
+  await page.getByLabel('Current GitHub plan').selectOption('enterprise')
+  await page.getByRole('button', { name: 'Overview', exact: true }).click()
+  await expect(page.getByText('Complete · self-reported')).toBeVisible()
+  const downloaded = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Export assessment JSON' }).click()
+  const json = JSON.parse(await readFile((await (await downloaded).path())!, 'utf8'))
+  expect(json.schemaVersion).toBe(2)
+  expect(json.assessments[0].answers).toEqual(original.answers)
+  expect(json.assessments[0].otherPlatform).toBe('Legacy SCM')
+  expect(json.assessments[0]).not.toHaveProperty('copilotPlan')
+})
+
+for (const locale of locales) {
+  test(`${locale}: required platform details, GitHub plans and removed fields`, async ({ page }, testInfo) => {
     const t = translator(locale)
-    const separator = locale === 'en' ? '.' : ','
-    const seats = locale === 'en' ? '1,000' : locale === 'pt-BR' ? '1.000' : '1000'
-    const assumptions = page.locator('.report-view .muted.small')
+    await page.goto('/?lang=' + locale)
+    await page.getByRole('button', { name: t('ui.start_an_assessment'), exact: true }).click()
+    const next = page.getByRole('button', { name: t('ui.continue_to_questions'), exact: true })
+    const platform = page.getByRole('combobox', { name: t('ui.current_development_platform'), exact: true })
+    const custom = page.getByLabel(t('profile.other_platform'))
+    await expect(platform).toHaveAttribute('required', '')
+    await expect(platform).toHaveValue('')
+    await page.getByLabel(t('ui.customer_organization'), { exact: true }).fill('Customer profile')
+    await expect(next).toBeDisabled()
+    await platform.selectOption('other')
+    await expect(custom).toHaveAttribute('required', '')
+    await expect(next).toBeDisabled()
+    await custom.fill('   ')
+    await expect(next).toBeDisabled()
+    await custom.fill('Plataforma São Paulo / Bogotá')
+    await expect(next).toBeEnabled()
+    await page.screenshot({ path: testInfo.outputPath('customer-details-other.png'), fullPage: true })
+    await platform.selectOption('gitlab')
+    await expect(custom).toHaveCount(0)
+    await expect(next).toBeEnabled()
+    await platform.selectOption('bitbucket')
+    await expect(next).toBeEnabled()
+    await platform.selectOption('other')
+    await expect(custom).toHaveValue('')
+    await expect(next).toBeDisabled()
+    // Navigation must not bypass the required custom platform.
+    await page.getByRole('button', { name: t('ui.report_roadmap'), exact: true }).click()
+    await expect(custom).toBeVisible()
+    await custom.fill('Plataforma São Paulo / Bogotá')
+    const plan = page.getByRole('combobox', { name: t('profile.current_plan'), exact: true })
+    await expect(plan.getByRole('option', { name: 'GitHub Business', exact: true })).toBeAttached()
+    await expect(plan.getByRole('option', { name: 'GitHub Enterprise', exact: true })).toBeAttached()
+    await expect(plan.getByRole('option', { name: /Copilot/ })).toHaveCount(0)
+    await plan.selectOption('business')
+    await expect(page.locator('.profile textarea')).toHaveCount(0)
+    await expect(page.locator('.assumptions')).toHaveCount(0)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    await next.click()
+    await page.getByRole('radio').nth(3).check()
+    await page.getByRole('button', { name: t('ui.report_roadmap'), exact: true }).click()
+    await expect(page.locator('.context-summary')).toContainText('Plataforma São Paulo / Bogotá')
+    await expect(page.locator('.context-summary')).toContainText('GitHub Business')
     await page.emulateMedia({ media: 'print' })
-    await expect(assumptions).toContainText(t('ui.seats_usd_month_12', { p1: seats, p2: `0${separator}00400` }))
-    await expect(assumptions).toContainText(t('ui.seats_hours_week_usd_hour_46_weeks', { p1: seats, p2: `0${separator}004`, p3: `50${separator}0000` }))
-    await expect(page.locator('.business-results')).toContainText(formatMoney(9200, locale))
+    await expect(page.locator('.context-summary')).toContainText('GitHub Business')
+    await expect(page.locator('.context-notes, .business-results')).toHaveCount(0)
     await page.emulateMedia({ media: null })
     const downloaded = page.waitForEvent('download')
     await page.getByRole('button', { name: t('ui.export_markdown'), exact: true }).click()
     const report = await readFile((await (await downloaded).path())!, 'utf8')
-    expect(report).toContain(`0${separator}00400`)
-    expect(report).toContain(`0${separator}004`)
-    expect(report).toContain(`50${separator}0000`)
-    expect(report).toContain(t('report.annual', { price: `0${separator}00400`, annual: `48${separator}00` }))
-    expect(report).toContain(t('report.capacity', {
-      gross: locale === 'en' ? '9,200.00' : locale === 'pt-BR' ? '9.200,00' : '9200,00',
-      hours: `0${separator}004`, rate: `50${separator}0000`, seats: 1000,
-    }))
-  }
-})
+    expect(report).toContain('Plataforma São Paulo / Bogotá')
+    expect(report).toContain('GitHub Business')
+    const jsonDownload = page.waitForEvent('download')
+    await page.getByRole('button', { name: t('ui.export_assessment_json'), exact: true }).click()
+    const json = JSON.parse(await readFile((await (await jsonDownload).path())!, 'utf8'))
+    expect(json.schemaVersion).toBe(2)
+    expect(json.assessments[0].platform).toBe('other')
+    expect(json.assessments[0].otherPlatform).toBe('Plataforma São Paulo / Bogotá')
+    expect(json.assessments[0].githubPlan).toBe('business')
+    for (const field of ['copilotPlan', 'dependencies', 'constraints', 'seats', 'seatCost', 'hoursSaved', 'hourlyRate']) {
+      expect(json.assessments[0]).not.toHaveProperty(field)
+    }
+    // Re-import must keep the new field and plan without renaming them.
+    await page.getByLabel(t('ui.import_assessment_json_file'), { exact: true }).setInputFiles({
+      name: 'profile.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(json)),
+    })
+    await page.getByRole('button', { name: t('ui.questionnaire'), exact: true }).click()
+    await expect(custom).toHaveValue('Plataforma São Paulo / Bogotá')
+    await expect(plan).toHaveValue('business')
+    await plan.selectOption('enterprise')
+    await page.getByRole('button', { name: t('ui.report_roadmap'), exact: true }).click()
+    await expect(page.locator('.context-summary')).toContainText('GitHub Enterprise')
+  })
+}
 
 for (const locale of ['pt-BR', 'es'] as const) {
   test(`${locale}: localizes all surfaces and exports without altering answers`, async ({ page }, testInfo) => {
@@ -63,6 +128,7 @@ for (const locale of ['pt-BR', 'es'] as const) {
     await page.getByRole('button', { name: t('ui.start_an_assessment'), exact: true }).click()
     await page.getByLabel(t('ui.customer_organization'), { exact: true }).fill('Empresa São Paulo / Bogotá')
     await page.getByLabel(t('ui.facilitator'), { exact: true }).fill('María João')
+    await page.getByRole('combobox', { name: t('ui.current_development_platform'), exact: true }).selectOption('github')
     await page.getByRole('button', { name: t('ui.continue_to_questions'), exact: true }).click()
     await expect(page.getByRole('heading', { name: t('model.how_is_access_to_your_development_platform_managed'), exact: true })).toBeVisible()
     await expect(page.getByText(t('model.sso_mfa_and_automated_provisioning_enforced'), { exact: true })).toBeVisible()

@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo } from 'react'
 import { pillars, ratingNames } from '../model'
 import { assess, level, pathDescriptions, roadmap } from '../scoring'
-import { contentTranslator, formatMoney, formatDate, formatNumber, formatAssumption, translator, sampleText, planName, hostingName } from './core'
+import { contentTranslator, formatDate, translator, sampleText, planName, hostingName, platformName } from './core'
 import type { Locale } from './core'
 
 export const LocaleContext = createContext<{ locale: Locale; setLocale: (locale: Locale) => void } | null>(null)
@@ -46,10 +46,8 @@ export function useI18n() {
     })),
     sampleText: (a: { sample: boolean }, value: string) => sampleText(a.sample, value, locale),
     date: (value: string) => formatDate(value, locale),
-    formatMoney: (value: number) => formatMoney(value, locale),
-    number: (value: string | number, digits = 0) => formatNumber(Number(value), locale, digits),
-    assumption: (value: string) => formatAssumption(value, locale),
-    platformLabels: { github: 'GitHub', 'azure-devops': 'Azure DevOps', mixed: 'GitHub + Azure DevOps', other: translator(locale)('ui.other_platform') },
+    platformLabels: { github: 'GitHub', 'azure-devops': 'Azure DevOps', gitlab: 'GitLab', bitbucket: 'Bitbucket', mixed: 'GitHub + Azure DevOps', other: translator(locale)('ui.other_platform') },
+    platformLabel: (a: { platform: string; otherPlatform: string }) => platformName(a.platform, locale, a.otherPlatform),
     planLabel: (value: string) => planName(value, locale),
     hostingLabel: (value: string) => hostingName(value, locale),
   }

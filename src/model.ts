@@ -4,22 +4,18 @@ export type Answer = {
   value: Rating | 'na' | null
   evidence: string
 }
-export type Platform = 'github' | 'azure-devops' | 'mixed' | 'other'
+export const platforms = ['github', 'azure-devops', 'gitlab', 'bitbucket', 'mixed', 'other'] as const
+export type Platform = typeof platforms[number] | ''
 export type Assessment = {
   id: string
   customer: string
   facilitator: string
   date: string
   platform: Platform
+  otherPlatform: string
   hosting: 'cloud' | 'server' | 'undecided'
-  copilotPlan: 'none' | 'business' | 'enterprise' | 'undecided'
+  githubPlan: 'none' | 'business' | 'enterprise' | 'undecided'
   developers: number
-  dependencies: string
-  constraints: string
-  seats: number
-  seatCost: string
-  hoursSaved: string
-  hourlyRate: string
   answers: Record<string, Answer>
   sample: boolean
   updatedAt: string
@@ -183,11 +179,13 @@ export function isAnswered(a: Assessment, id: string) {
   const answer = a.answers[id]
   return answer !== undefined && answer.value !== null
 }
+export function isProfileComplete(a: Assessment) {
+  return Boolean(a.customer.trim() && a.platform && (a.platform !== 'other' || a.otherPlatform.trim()))
+}
 export function newAssessment(): Assessment {
   return {
     id: crypto.randomUUID(), customer: '', facilitator: '', date: new Date().toISOString().slice(0, 10),
-    platform: 'github', hosting: 'undecided', copilotPlan: 'undecided', developers: 0,
-    dependencies: '', constraints: '', seats: 0, seatCost: '', hoursSaved: '', hourlyRate: '',
+    platform: '', otherPlatform: '', hosting: 'undecided', githubPlan: 'undecided', developers: 0,
     answers: {}, sample: false, updatedAt: new Date().toISOString(),
   }
 }
@@ -196,9 +194,7 @@ export function exampleAssessment(): Assessment {
   const ratings: Rating[] = [3, 3, 2, 2, 2, 2, 2, 3, 1, 2, 3, 2, 2, 2, 2, 3, 3, 2, 2, 2, 2, 2, 1, 2, 1, 3, 2, 3, 2, 2]
   return {
     ...assessment, customer: en["model.northstar_engineering"], facilitator: en["model.sample_facilitator"], platform: 'mixed',
-    hosting: 'cloud', copilotPlan: 'business', developers: 240, seats: 80, sample: true,
-    dependencies: en["model.azure_boards_retained_for_portfolio_planning_eight_production_pipelines"],
-    constraints: en["model.security_approval_required_before_expanding_ai_use_identity_remains"],
+    hosting: 'cloud', githubPlan: 'enterprise', developers: 240, sample: true,
     answers: Object.fromEntries(allQuestions.map((q, i) => [q.id, {
         value: ratings[i], evidence: en["model.illustrative_response_only_replace_with_evidence_gathered_during_a"],
       }])),
