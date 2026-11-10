@@ -1,10 +1,25 @@
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { execFileSync } from 'node:child_process'
 
 export function assertSha(value) {
   if (typeof value !== 'string' || !/^[a-f0-9]{40}$/.test(value)) throw new Error('Expected a full Git commit SHA.')
   return value
+}
+
+export function githubFederationSubject(profile) {
+  if (profile?.use_default !== true || typeof profile.use_immutable_subject !== 'boolean') {
+    throw new Error('Unsupported or custom GitHub OIDC subject profile; review the trust configuration explicitly.')
+  }
+  const name = '[a-zA-Z0-9_.-]+'
+  const prefixPattern = profile.use_immutable_subject
+    ? new RegExp(`^repo:${name}@[1-9][0-9]*/${name}@[1-9][0-9]*$`)
+    : new RegExp(`^repo:${name}/${name}$`)
+  if (typeof profile.sub_claim_prefix !== 'string' || !prefixPattern.test(profile.sub_claim_prefix)) {
+    throw new Error('GitHub did not return a valid subject prefix matching its configured OIDC mode.')
+  }
+  return `${profile.sub_claim_prefix}:ref:refs/heads/main`
 }
 
 export function deploymentCandidate({ eventName, event, repository, ref, sha }) {
@@ -126,15 +141,33 @@ export function deploymentParameters(app, registry, image) {
   }
 }
 
+export function imageRevisionReady(app, image) {
+  const p = app.properties
+  return p?.provisioningState === 'Succeeded' && Boolean(p.latestRevisionName)
+    && p.latestReadyRevisionName === p.latestRevisionName && p.template?.containers?.[0]?.image === image
+}
+
 export function readyEndpoint(app, image) {
   const p = app.properties
-  if (p?.provisioningState !== 'Succeeded' || !p.latestRevisionName || p.latestReadyRevisionName !== p.latestRevisionName
-    || p.template?.containers?.[0]?.image !== image) throw new Error('The expected image does not have a ready revision.')
+  if (!imageRevisionReady(app, image)) throw new Error('The expected image does not have a ready revision.')
   assertPublicDemoIngress(app)
   if (!p.configuration.ingress.fqdn?.endsWith('.azurecontainerapps.io')) {
     throw new Error('Expected the existing HTTPS-only Container Apps endpoint.')
   }
   return `https://${p.configuration.ingress.fqdn}/`
+}
+
+export async function waitForReady(read, image, { attempts = 12, pause = ms => new Promise(resolve => setTimeout(resolve, ms)) } = {}) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const app = await read()
+    assertPublicDemoIngress(app)
+    if (imageRevisionReady(app, image)) return readyEndpoint(app, image)
+    if (attempt + 1 < attempts) {
+      console.log(`Waiting for the expected ready revision (${attempt + 1}/${attempts}).`)
+      await pause(10_000)
+    }
+  }
+  throw new Error('Timed out waiting for the expected image to have a ready revision.')
 }
 
 export function verifyBuild(info, sha) {
@@ -168,7 +201,9 @@ async function health(url, sha) {
 }
 
 async function main(command) {
-  if (command === 'gate') {
+  if (command === 'federation-subject') {
+    console.log(githubFederationSubject(JSON.parse(readFileSync(0, 'utf8'))))
+  } else if (command === 'gate') {
     const event = JSON.parse(readFileSync(required('GITHUB_EVENT_PATH'), 'utf8'))
     const candidate = deploymentCandidate({
       eventName: required('GITHUB_EVENT_NAME'), event, repository: required('GITHUB_REPOSITORY'),
@@ -211,6 +246,16 @@ async function main(command) {
   } else if (command === 'ready') {
     const app = JSON.parse(readFileSync(resolve(required('RUNNER_TEMP'), 'deployed-app.json'), 'utf8'))
     verifyEndpoint(readyEndpoint(app, required('CONTAINER_IMAGE')), required('ASSESSMENT_URL'))
+    output('deployed', 'true')
+  } else if (command === 'wait-ready') {
+    const args = ['resource', 'show', '--subscription', required('AZURE_SUBSCRIPTION_ID'),
+      '--resource-group', required('AZURE_RESOURCE_GROUP'), '--resource-type', 'Microsoft.App/containerApps',
+      '--name', required('AZURE_CONTAINER_APP'), '--api-version', '2026-07-01', '--output', 'json']
+    const read = () => JSON.parse(execFileSync('az', args, {
+      encoding: 'utf8', timeout: 30_000, stdio: ['ignore', 'pipe', 'inherit'],
+    }))
+    const endpoint = await waitForReady(read, required('CONTAINER_IMAGE'))
+    verifyEndpoint(endpoint, required('ASSESSMENT_URL'))
     output('deployed', 'true')
   } else if (command === 'health') {
     const url = new URL(required('ASSESSMENT_URL'))

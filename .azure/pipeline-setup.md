@@ -33,17 +33,19 @@ The federated credential uses:
 
 ```text
 Issuer:   https://token.actions.githubusercontent.com
-Subject:  repo:<OWNER>/<REPOSITORY>:ref:refs/heads/main
+Subject:  <GITHUB_SUB_CLAIM_PREFIX>:ref:refs/heads/main
 Audience: api://AzureADTokenExchange
 ```
 
-Replace placeholders locally, not in committed documentation. Verify the subject matches the intended repository exactly.
+The setup script reads `actions/oidc/customization/sub` for the intended repository and derives the subject from its `sub_claim_prefix`. Repositories using immutable subjects include owner and repository IDs in that prefix; a name-only subject will not match. Keep immutable subjects enabled. Both default immutable and default legacy profiles are supported, but missing, inconsistent or custom profiles fail explicitly rather than guessing a trust relationship.
+
+Replace placeholders locally, not in committed documentation. Verify the subject matches the intended repository's actual profile exactly. Issuer and audience remain fixed; only the main branch is trusted. The Bicep subject is a required parameter with no legacy-format fallback.
 
 The current private-repository plan does not provide private branch protection or deployment-environment approvals. The workflow therefore uses a strict main-ref federation and repository Secrets. It gates deployment on CI but does not enforce PRs or independent review. A suitably licensed repository can add required reviews and environment approvals separately.
 
 ## Optional administrator setup script
 
-For reconciliation, review `scripts/setup-azure-auth-for-pipeline.ps1` and its Bicep templates before running them. Use the actual target values only in your local session. The operator requires permission to create the identity resource group, assign the scoped role, and administer repository Secrets.
+For reconciliation, review `scripts/setup-azure-auth-for-pipeline.ps1` and its Bicep templates before running them. Azure CLI, `gh` and Node.js 24 or newer are required. Use the actual target values only in your local session. The operator requires permission to create the identity resource group, assign the scoped role, read the repository's OIDC profile, and administer repository Secrets.
 
 Run with `-WhatIf` first. The script previews the identity deployment and prompts before applying Azure permissions or configuring Secrets. It is not executed by CI or CD. Running it is unnecessary when the intended identity already exists and an administrator enters the Secrets manually.
 
@@ -56,7 +58,7 @@ No script execution, PR creation or merge automatically fills repository Secrets
 3. Only an eligible release acquires the concurrency lock. The reusable workflow retains that lock through deployment and the separate low-privilege smoke job; no duplicate lock exists inside it.
 4. OIDC signs in as the dedicated identity. ACR builds the verified source with a unique SHA/run/attempt tag; deployment uses the immutable digest.
 5. Main and live ingress are rechecked before applying Bicep. Internal ingress, IP restrictions, client-certificate requirements and incompatible ingress customizations stop CD rather than being cleared. Extend the template through review to preserve those controls; do not remove restrictions to make CD pass.
-6. The smoke job verifies HTTPS, the actual build commit, all three language workflows, report precision and refresh-to-reset behavior. It has no Azure OIDC permission and never starts a local fallback server.
+6. After ARM deployment completes, bounded polling waits for a fresh read of the target image's ready revision; deployment completion alone is not readiness. Ingress checks remain enforced, and an older image or timeout fails the run. The smoke job then verifies HTTPS, the actual build commit, all three language workflows, report precision and refresh-to-reset behavior. It has no Azure OIDC permission and never starts a local fallback server.
 
 Only the existing demo is targeted. The code deployment wrapper does not reprovision the registry/environment or grant roles. Failure produces a failed Actions run and diagnostic artifacts; it never silently rolls back, deletes resources, changes regions/SKUs or disables HTTPS.
 
